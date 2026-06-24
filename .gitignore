@@ -22,6 +22,24 @@ functions/lib/
 GoogleService-Info.plist
 google-services.json
 
+# Secrets & local env — never commit (Cloud Functions read these from process.env)
+.env
+.env.*
+functions/.env
+functions/.env.*
+.runtimeconfig.json
+functions/.runtimeconfig.json
+
+# Service-account / admin keys
+*serviceAccount*.json
+*-adminsdk-*.json
+
+# Apple signing material
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+
 # Android (future Kotlin app)
 android/.gradle/
 android/local.properties

@@ -46,6 +46,7 @@ struct TrendsAnalysis {
 
     let window: Window
     let target: Nutrients
+    let references: NutrientAmounts       // personalized focused-8 daily references (by sex)
     let points: [DailyPoint]              // logged days within the window, oldest → newest
     let loggedDayCount: Int
     let averageKcal: Double
@@ -68,7 +69,7 @@ struct TrendsAnalysis {
 
     /// Rolling average ÷ reference for a nutrient (1.0 = exactly meeting the reference).
     func adequacy(_ n: Nutrient) -> Double {
-        let ref = n.referenceDaily(target: target)
+        let ref = references[n]
         guard ref > 0 else { return 0 }
         return (nutrientAverages[n] ?? 0) / ref
     }
@@ -77,7 +78,7 @@ struct TrendsAnalysis {
 
     // MARK: - Compute
 
-    static func compute(days: [DayRollup], target: Nutrients,
+    static func compute(days: [DayRollup], target: Nutrients, references: NutrientAmounts,
                         window: Window, now: Date = Date()) -> TrendsAnalysis {
         let cal = Calendar.current
         let start = cal.date(byAdding: .day, value: -(window.rawValue - 1),
@@ -112,6 +113,7 @@ struct TrendsAnalysis {
         return TrendsAnalysis(
             window: window,
             target: target,
+            references: references,
             points: points,
             loggedDayCount: count,
             averageKcal: avgKcal,
@@ -121,7 +123,7 @@ struct TrendsAnalysis {
             underCount: under,
             overCount: over,
             patterns: makePatterns(logged: logged, nutrientAverages: nutrientAverages,
-                                   target: target, cal: cal),
+                                   references: references, cal: cal),
             summary: makeSummary(count: count, window: window, inRange: inRange,
                                  avgKcal: avgKcal, target: target))
     }
@@ -144,7 +146,7 @@ struct TrendsAnalysis {
     // MARK: - Gentle copy
 
     private static func makePatterns(logged: [DayRollup], nutrientAverages: [Nutrient: Double],
-                                     target: Nutrients, cal: Calendar) -> [String] {
+                                     references: NutrientAmounts, cal: Calendar) -> [String] {
         var out: [String] = []
 
         // Weekend vs weekday rhythm (only if we've seen both).
@@ -160,8 +162,8 @@ struct TrendsAnalysis {
         // Nutrients running low on the rolling average — the gentle nudge (not protein; it has its row).
         let low = Nutrient.allCases
             .filter { $0 != .protein }
-            .map { ($0, ($0.referenceDaily(target: target) > 0
-                        ? (nutrientAverages[$0] ?? 0) / $0.referenceDaily(target: target) : 1)) }
+            .map { ($0, (references[$0] > 0
+                        ? (nutrientAverages[$0] ?? 0) / references[$0] : 1)) }
             .filter { $0.1 < 0.7 }
             .sorted { $0.1 < $1.1 }
             .prefix(2)

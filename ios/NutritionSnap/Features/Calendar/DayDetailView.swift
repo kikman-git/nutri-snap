@@ -107,7 +107,7 @@ struct DayDetailView: View {
             }
             ForEach(Nutrient.allCases.filter { $0 != .protein }) { n in
                 MicroBar(nutrient: n, value: day.microTotals[n],
-                         reference: n.referenceDaily(target: target))
+                         reference: store.references[n])
             }
         }
         .padding(Theme.Spacing.lg)
@@ -143,7 +143,7 @@ struct DayDetailView: View {
 
     private func makeShareCard() -> ShareCard {
         ShareCard(date: day.date, photos: dayPhotos(),
-                  totals: day.totals, micros: day.microTotals, target: target)
+                  totals: day.totals, micros: day.microTotals, references: store.references)
     }
 
     private func prepareShare() async {
