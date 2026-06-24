@@ -1,0 +1,33 @@
+# XcodeGen generates this from project.yml — recreate with `xcodegen generate`.
+NutritionSnap.xcodeproj/
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Node / Firebase Functions
+node_modules/
+functions/node_modules/
+functions/lib/
+
+# Firebase (added later — never commit these)
+GoogleService-Info.plist
+google-services.json
+
+# Android (future Kotlin app)
+android/.gradle/
+android/local.properties
+
+# macOS
+.DS_Store
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json

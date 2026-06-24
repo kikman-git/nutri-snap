@@ -1,0 +1,313 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "(%@)" : {
+
+    },
+    "/ %@ kcal" : {
+
+    },
+    "%@" : {
+
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ / %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%@ / %@ g" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@ g"
+          }
+        }
+      }
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ g" : {
+
+    },
+    "%@ logged · ~%@ kcal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ logged · ~%2$@ kcal"
+          }
+        }
+      }
+    },
+    "%@ of %@ days on track" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@ days on track"
+          }
+        }
+      }
+    },
+    "+%@" : {
+
+    },
+    "~%@ kcal" : {
+
+    },
+    "✓" : {
+
+    },
+    "Add a note (optional)" : {
+
+    },
+    "Average over the last %@, vs daily reference" : {
+
+    },
+    "C %@" : {
+
+    },
+    "Calendar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダー"
+          }
+        }
+      }
+    },
+    "Couldn't pull that together just now. Mind trying again in a bit?" : {
+
+    },
+    "Couldn't read that" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取れませんでした"
+          }
+        }
+      }
+    },
+    "Daily calories" : {
+
+    },
+    "Daily nutrient needs" : {
+
+    },
+    "Edit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集"
+          }
+        }
+      }
+    },
+    "F %@" : {
+
+    },
+    "Focused micros" : {
+
+    },
+    "General adult guidance, per day. ✓ = the app estimates it from your photos." : {
+
+    },
+    "Hmm, I couldn't find a meal here." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うーん、ここに食事が見つかりませんでした。"
+          }
+        }
+      }
+    },
+    "Item" : {
+
+    },
+    "Looking back over your %@…" : {
+
+    },
+    "Make quick corrections to item details, macros, and focused micros." : {
+
+    },
+    "Meal total" : {
+
+    },
+    "Micronutrients" : {
+
+    },
+    "No meal spotted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "食事が見つかりません"
+          }
+        }
+      }
+    },
+    "Nutri Snap" : {
+
+    },
+    "Nutrient sufficiency" : {
+
+    },
+    "On track" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "順調"
+          }
+        }
+      }
+    },
+    "P %@" : {
+
+    },
+    "Reading your meal…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "食事を読み取り中…"
+          }
+        }
+      }
+    },
+    "Reference: Japanese MHLW dietary intakes (adult). Not medical advice." : {
+
+    },
+    "Retake" : {
+
+    },
+    "Review values as you saw them" : {
+
+    },
+    "Snap" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撮る"
+          }
+        }
+      }
+    },
+    "Snap another" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一枚撮る"
+          }
+        }
+      }
+    },
+    "Snap your meal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "食事を撮影"
+          }
+        }
+      }
+    },
+    "Tap to confirm what this was" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップして内容を確認"
+          }
+        }
+      }
+    },
+    "target %@" : {
+
+    },
+    "This day's total, vs daily reference" : {
+
+    },
+    "Trends" : {
+
+    },
+    "Try another photo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別の写真を試す"
+          }
+        }
+      }
+    },
+    "We couldn't quite read that one. Mind trying again?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく読み取れませんでした。もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "You're offline — we'll read this once you're back." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインです。接続が戻ったら読み取ります。"
+          }
+        }
+      }
+    },
+    "Your trends are warming up" : {
+
+    }
+  },
+  "version" : "1.0"
+}

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Nutrition Snap — app icon (vector master).
+  Concept: "snap a healthy meal." A calm cream viewfinder frame (ring + reticle ticks)
+  around a warm-clay bowl with a single sage sprout. Warm-minimal, one clay accent
+  (#C56A4E) on cream (#FBF7F0); sage (#A9C0B8) is the only secondary, used once for
+  the leaf to signal nutrition. No red, no text — legible down to small sizes.
+
+  Master is 1024x1024 (iOS single-size app icon). Rasterize to PNG for the asset catalog.
+-->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="78%">
+      <stop offset="0%"  stop-color="#FEFCF8"/>
+      <stop offset="62%" stop-color="#FBF4E9"/>
+      <stop offset="100%" stop-color="#F1E5D4"/>
+    </radialGradient>
+    <linearGradient id="clay" x1="320" y1="470" x2="720" y2="800" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#D2785B"/>
+      <stop offset="100%" stop-color="#BC5E44"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="448" y1="250" x2="576" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#B7CCC3"/>
+      <stop offset="100%" stop-color="#9DB4AA"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Cream field -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Viewfinder frame: a calm ring + four reticle ticks (N/E/S/W) -->
+  <g stroke="#C56A4E" stroke-linecap="round">
+    <circle cx="512" cy="512" r="372" stroke-width="14" opacity="0.28"/>
+    <g stroke-width="14" opacity="0.55">
+      <line x1="512" y1="118" x2="512" y2="170"/>
+      <line x1="512" y1="854" x2="512" y2="906"/>
+      <line x1="118" y1="512" x2="170" y2="512"/>
+      <line x1="854" y1="512" x2="906" y2="512"/>
+    </g>
+  </g>
+
+  <!-- Sprout: stem + single sage leaf rising from the bowl -->
+  <path d="M512 556 C 512 480 512 430 512 392" stroke="#BC5E44" stroke-width="13" stroke-linecap="round"/>
+  <g>
+    <path d="M512 250
+             C 612 300 612 426 512 478
+             C 412 426 412 300 512 250 Z" fill="url(#leaf)"/>
+    <!-- midrib -->
+    <path d="M512 286 C 512 360 512 410 512 452" stroke="#7E988D" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+  </g>
+
+  <!-- Bowl: clay body with an open elliptical mouth carved by the cream field -->
+  <path d="M280 556
+           C 280 700 392 772 512 772
+           C 632 772 744 700 744 556 Z" fill="url(#clay)"/>
+  <ellipse cx="512" cy="556" rx="232" ry="44" fill="url(#bg)"/>
+  <ellipse cx="512" cy="556" rx="232" ry="44" fill="none" stroke="#BC5E44" stroke-width="11"/>
+</svg>

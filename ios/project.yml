@@ -1,0 +1,72 @@
+name: NutritionSnap
+
+options:
+  bundleIdPrefix: com.kikman
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    # Swift 5 language mode: gentler than Swift 6 strict concurrency while we
+    # learn the layout. Bump to 6.0 once the shell is solid. (CLAUDE.md notes this.)
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: YES
+
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "11.0.0"
+
+targets:
+  NutritionSnap:
+    type: application
+    platform: iOS
+    sources:
+      - NutritionSnap
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kikman.nutrisnap
+        PRODUCT_NAME: NutritionSnap
+        TARGETED_DEVICE_FAMILY: "1" # iPhone only for now
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: Accent
+        INFOPLIST_KEY_CFBundleDisplayName: Nutri Snap
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        # Bilingual from day one (PRD §3). English polished first.
+        INFOPLIST_KEY_CFBundleLocalizations: "en ja"
+        # Capture (PRD §5.2). PhotosPicker needs no key; this is for the live-camera path.
+        INFOPLIST_KEY_NSCameraUsageDescription: "Take a photo of your meal to estimate its nutrition."
+        # Add-only: save meals snapped in-app to your Photos library (library-picked ones already live there).
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "Save the meals you snap to your photo library."
+        # Device signing (free Apple ID). Free teams provision only with a device connected.
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 5N7NUK38D4
+    dependencies:
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseAI
+      - package: Firebase
+        product: FirebaseAppCheck
+      # M3 persistence: anonymous Auth for the uid, Firestore (offline) for entries +
+      # per-day rollups. Photos are stored on-device (free tier) — Cloud Storage needs the
+      # Blaze plan, so it's deferred to M4 when cross-device sync lands.
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+
+schemes:
+  NutritionSnap:
+    build:
+      targets:
+        NutritionSnap: all
+    run:
+      config: Debug
+    test:
+      config: Debug
