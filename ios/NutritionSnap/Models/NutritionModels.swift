@@ -44,8 +44,8 @@ struct Nutrients: Codable, Hashable {
 /// The "focused 8" nutrients the app tracks for long-term health/beauty (see memory:
 /// nutrition-app-direction). Estimated from photos — low-confidence by nature, judged on
 /// rolling adequacy over time, never daily pass/fail. Protein lives in `Nutrients`; the other
-/// seven ride along in `NutrientAmounts`. Reference intakes are MHLW DRIs, adult-male default
-/// until personalized at onboarding (M5).
+/// seven ride along in `NutrientAmounts`. Reference intakes are MHLW DRIs, personalized by sex from
+/// the profile at onboarding (`MealStore.references` / `NutritionMath.microReferences`).
 enum Nutrient: String, CaseIterable, Identifiable, Codable {
     case protein, fiber, omega3, vitaminC, vitaminA, zinc, iron, magnesium
 
@@ -69,21 +69,6 @@ enum Nutrient: String, CaseIterable, Identifiable, Codable {
         case .protein, .fiber, .omega3:            return "g"
         case .vitaminC, .zinc, .iron, .magnesium:  return "mg"
         case .vitaminA:                            return "µg"
-        }
-    }
-
-    /// Daily reference (MHLW adult-male DRI). Protein defers to the user's macro target so the
-    /// app shows one protein number everywhere; the rest are static until M5 personalization.
-    func referenceDaily(target: Nutrients) -> Double {
-        switch self {
-        case .protein:   return target.protein
-        case .fiber:     return 21
-        case .omega3:    return 2.0
-        case .vitaminC:  return 100
-        case .vitaminA:  return 900
-        case .zinc:      return 11
-        case .iron:      return 7.5
-        case .magnesium: return 370
         }
     }
 }
@@ -116,6 +101,15 @@ extension NutrientAmounts: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(values)
+    }
+}
+
+extension NutrientAmounts {
+    /// Neutral adult-male references — what previews/sample rendering compare against before a
+    /// profile personalizes them (the real screens read `MealStore.references`). Protein uses the
+    /// supplied macro target.
+    static func defaultReference(proteinTarget: Double) -> NutrientAmounts {
+        NutritionMath.microReferences(sex: .male, proteinTarget: proteinTarget)
     }
 }
 
@@ -224,9 +218,114 @@ extension DayRollup {
     }
 }
 
-/// The Firestore `users/{uid}` profile doc (PRD §8). For now only the daily target — seeded with a
-/// default on first launch; Mifflin–St Jeor personalization writes it at onboarding (M5).
+/// Biological sex — the input the Mifflin–St Jeor constant and the MHLW micro references key off
+/// (PRD §4). Not identity; just the figure the equations need.
+enum BiologicalSex: String, Codable, CaseIterable, Identifiable {
+    case male, female
+    var id: String { rawValue }
+    var label: String { self == .male ? "Male" : "Female" }
+}
+
+/// Daily activity multiplier on BMR (PRD §4).
+enum ActivityLevel: String, Codable, CaseIterable, Identifiable {
+    case sedentary, light, moderate, active, veryActive
+    var id: String { rawValue }
+
+    var factor: Double {
+        switch self {
+        case .sedentary:  return 1.2
+        case .light:      return 1.375
+        case .moderate:   return 1.55
+        case .active:     return 1.725
+        case .veryActive: return 1.9
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .sedentary:  return "Rarely active"
+        case .light:      return "Lightly active"
+        case .moderate:   return "Moderately active"
+        case .active:     return "Very active"
+        case .veryActive: return "Extremely active"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .sedentary:  return "Desk job, little exercise"
+        case .light:      return "Light exercise 1–3 days/week"
+        case .moderate:   return "Exercise 3–5 days/week"
+        case .active:     return "Hard exercise 6–7 days/week"
+        case .veryActive: return "Physical job or twice-daily training"
+        }
+    }
+}
+
+/// Weight goal — a gentle ±% on maintenance (PRD §4). No aggressive deficits; this is a calm coach.
+enum Goal: String, Codable, CaseIterable, Identifiable {
+    case lose, maintain, gain
+    var id: String { rawValue }
+
+    var factor: Double {
+        switch self {
+        case .lose:     return 0.85    // −15%
+        case .maintain: return 1.0
+        case .gain:     return 1.10    // +10%
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .lose:     return "Ease down"
+        case .maintain: return "Maintain"
+        case .gain:     return "Build up"
+        }
+    }
+}
+
+/// The Firestore `users/{uid}` profile doc (PRD §8): the body stats behind the personal target plus
+/// the computed `targets` the calendar + Trends compare against. `onboarded` gates the first-run
+/// flow. Tolerant decode (like `DayRollup`) so a legacy M2/M3 doc — which only had `targets` +
+/// `createdAt` — loads with calm defaults and is offered onboarding rather than failing to decode.
 struct UserProfile: Codable, Hashable {
+    var sex: BiologicalSex
+    var age: Int
+    var heightCm: Double
+    var weightKg: Double
+    var activity: ActivityLevel
+    var goal: Goal
     var targets: Nutrients
     var createdAt: Date
+    var onboarded: Bool
+
+    /// Seed for a brand-new account, before onboarding personalizes it. Neutral adult defaults.
+    static var seed: UserProfile {
+        var p = UserProfile(sex: .male, age: 30, heightCm: 170, weightKg: 65,
+                            activity: .moderate, goal: .maintain,
+                            targets: .zero, createdAt: Date(), onboarded: false)
+        p.targets = NutritionMath.target(for: p)
+        return p
+    }
+}
+
+extension UserProfile {
+    private enum CodingKeys: String, CodingKey {
+        case sex, age, heightCm, weightKg, activity, goal, targets, createdAt, onboarded
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sex       = try c.decodeIfPresent(BiologicalSex.self, forKey: .sex) ?? .male
+        age       = try c.decodeIfPresent(Int.self, forKey: .age) ?? 30
+        heightCm  = try c.decodeIfPresent(Double.self, forKey: .heightCm) ?? 170
+        weightKg  = try c.decodeIfPresent(Double.self, forKey: .weightKg) ?? 65
+        activity  = try c.decodeIfPresent(ActivityLevel.self, forKey: .activity) ?? .moderate
+        goal      = try c.decodeIfPresent(Goal.self, forKey: .goal) ?? .maintain
+        targets   = try c.decodeIfPresent(Nutrients.self, forKey: .targets)
+            ?? Nutrients(kcal: 2000, protein: 100, carbs: 250, fat: 67)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        // A legacy doc (no `onboarded` key) predates personalization → invite onboarding once.
+        onboarded = try c.decodeIfPresent(Bool.self, forKey: .onboarded) ?? false
+    }
 }

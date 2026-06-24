@@ -11,6 +11,7 @@ struct TrendsScreen: View {
 
     @State private var window: TrendsAnalysis.Window = .week
     @State private var showReflection = false
+    @State private var showProfile = false
 
     init(reflector: WeeklyReflecting = GeminiReflector.shared) {
         self.reflector = reflector
@@ -19,7 +20,8 @@ struct TrendsScreen: View {
     private var target: Nutrients { store.target }
 
     private var analysis: TrendsAnalysis {
-        TrendsAnalysis.compute(days: store.rollups, target: target, window: window)
+        TrendsAnalysis.compute(days: store.rollups, target: target,
+                               references: store.references, window: window)
     }
 
     var body: some View {
@@ -45,15 +47,25 @@ struct TrendsScreen: View {
         .sheet(isPresented: $showReflection) {
             ReflectionSheet(input: reflectionInput, reflector: reflector)
         }
+        .sheet(isPresented: $showProfile) { ProfileSettingsSheet() }
     }
 
     // MARK: - Sections
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            Text("Trends")
-                .font(Theme.Typography.screenTitle)
-                .foregroundStyle(Theme.Palette.ink)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Trends")
+                    .font(Theme.Typography.screenTitle)
+                    .foregroundStyle(Theme.Palette.ink)
+                Spacer()
+                Button { showProfile = true } label: {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Theme.Palette.inkSecondary)
+                }
+                .accessibilityLabel("Your details")
+            }
 
             Picker("Window", selection: $window) {
                 ForEach(TrendsAnalysis.Window.allCases) { w in
@@ -97,7 +109,7 @@ struct TrendsScreen: View {
 
     private func nutrientRow(_ n: Nutrient) -> some View {
         let avg = analysis.nutrientAverages[n] ?? 0
-        let ref = n.referenceDaily(target: target)
+        let ref = store.references[n]
         let ratio = analysis.adequacy(n)
         let state = analysis.sufficiency(n)
         return VStack(alignment: .leading, spacing: 4) {

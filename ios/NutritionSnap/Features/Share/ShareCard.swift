@@ -13,7 +13,7 @@ struct ShareCard: View {
     let photos: [UIImage?]
     let totals: Nutrients
     let micros: NutrientAmounts
-    let target: Nutrients
+    let references: NutrientAmounts
 
     /// 4:5 portrait authored in points; `ShareCardRenderer` scales ×3 → 1080×1350 (Instagram feed).
     static let size = CGSize(width: 360, height: 450)
@@ -60,7 +60,7 @@ struct ShareCard: View {
         HStack(spacing: 4) {
             ForEach(focusedMicros) { n in
                 NutrientRing(value: micros[n],
-                             reference: n.referenceDaily(target: target),
+                             reference: references[n],
                              name: Self.shortName(n))
                     .frame(maxWidth: .infinity)
             }
@@ -224,7 +224,7 @@ struct ActivityView: UIViewControllerRepresentable {
               totals: Nutrients(kcal: 1840, protein: 96, carbs: 210, fat: 62),
               micros: NutrientAmounts([.fiber: 18, .omega3: 1.4, .vitaminC: 72,
                                        .vitaminA: 540, .zinc: 7, .iron: 9, .magnesium: 240]),
-              target: SampleData.target)
+              references: .defaultReference(proteinTarget: SampleData.target.protein))
         .padding()
         .background(Color.gray.opacity(0.2))
 }

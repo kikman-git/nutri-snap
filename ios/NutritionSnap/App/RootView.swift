@@ -13,9 +13,12 @@ struct RootView: View {
     @State private var selection: Tab
     @State private var store: MealStore
     @State private var model: CaptureViewModel
+    /// Screenshot hook: force the onboarding gate open (the CLI can't tap through it otherwise).
+    private let forceOnboarding: Bool
     @Environment(\.scenePhase) private var scenePhase
 
     init(store: MealStore? = nil, estimator: MealEstimating? = nil) {
+        self.forceOnboarding = ProcessInfo.processInfo.environment["FORCE_ONBOARDING"] != nil
         // Construct the real store/model here (View.init is main-actor) rather than as default
         // arguments, which would be evaluated at nonisolated call sites.
         let env = ProcessInfo.processInfo.environment
@@ -45,6 +48,11 @@ struct RootView: View {
         }
         .safeAreaInset(edge: .bottom) { tabBar }
         .environment(store)
+        // First-run gate (PRD §9 step 5): personalize the target before showing the tabs. Auto-
+        // dismisses when onboarding writes the profile (`needsOnboarding` flips false).
+        .fullScreenCover(isPresented: Binding(get: { showOnboarding }, set: { _ in })) {
+            OnboardingView().environment(store)
+        }
         // Run the camera only while the Snap tab is showing; release it elsewhere.
         .task(id: selection) {
             if selection == .snap { await model.camera.start() } else { model.camera.stop() }
@@ -99,6 +107,9 @@ struct RootView: View {
         }
         .buttonStyle(.plain)
     }
+
+    /// Show onboarding once the store is ready and the account hasn't personalized its target.
+    private var showOnboarding: Bool { forceOnboarding || (store.ready && store.needsOnboarding) }
 
     private var onSnap: Bool { selection == .snap }
 

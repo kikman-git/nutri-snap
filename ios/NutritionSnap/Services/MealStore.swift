@@ -13,8 +13,16 @@ import FirebaseFirestore
 final class MealStore {
     /// Per-day rollups, oldest → newest. Drives the calendar grid + Trends.
     private(set) var rollups: [DayRollup] = []
-    /// Daily target (seeded default until M5 onboarding writes a personalized one).
+    /// Daily target — personalized from the profile (Mifflin–St Jeor) once onboarding lands;
+    /// a neutral default before that and in sample mode.
     private(set) var target: Nutrients = SampleData.target
+    /// Personalized daily micronutrient references (focused 8) — MHLW DRI by the profile's sex.
+    /// Threads next to `target` to the micro displays; protein follows the macro target.
+    private(set) var references: NutrientAmounts = .defaultReference(proteinTarget: SampleData.target.protein)
+    /// The signed-in user's profile (body stats + computed target). Nil until loaded / in sample mode.
+    private(set) var profile: UserProfile?
+    /// True once auth + load find an account that hasn't finished onboarding — `RootView` gates on it.
+    private(set) var needsOnboarding = false
     /// Most recent logged meal, for the capture screen's "just logged" card.
     private(set) var recentEntry: Entry?
     /// False until auth + the first snapshot land — screens can show a calm warming state.
@@ -66,14 +74,23 @@ final class MealStore {
     }
 
     private func loadOrSeedProfile(_ userRef: DocumentReference) async {
-        guard let snap = try? await userRef.getDocument() else { return }
-        if let profile = try? snap.data(as: UserProfile.self) {
-            target = profile.targets
+        let snap = try? await userRef.getDocument()
+        if let snap, snap.exists, let profile = try? snap.data(as: UserProfile.self) {
+            apply(profile)
         } else {
-            let profile = UserProfile(targets: SampleData.target, createdAt: Date())
+            // Brand-new account: seed neutral defaults, then invite onboarding.
+            let profile = UserProfile.seed
             try? userRef.setData(from: profile)
-            target = profile.targets
+            apply(profile)
         }
+    }
+
+    /// Reflect a profile into the screens' state: the personal target + whether onboarding is due.
+    private func apply(_ profile: UserProfile) {
+        self.profile = profile
+        target = profile.targets
+        references = NutritionMath.microReferences(sex: profile.sex, proteinTarget: profile.targets.protein)
+        needsOnboarding = !profile.onboarded
     }
 
     private func attachRollupListener(_ userRef: DocumentReference) {
@@ -254,6 +271,35 @@ final class MealStore {
         }
 
         if recentEntry?.id == oldEntry.id { recentEntry = updated }
+    }
+
+    // MARK: - Profile
+
+    /// Persist body stats and the freshly computed target — onboarding finish or a later Settings
+    /// edit. Offline-safe: `setData(merge:)` queues through the same local cache as meal writes.
+    func saveProfile(sex: BiologicalSex, age: Int, heightCm: Double, weightKg: Double,
+                     activity: ActivityLevel, goal: Goal) async {
+        await awaitReady()
+        var p = UserProfile(sex: sex, age: age, heightCm: heightCm, weightKg: weightKg,
+                            activity: activity, goal: goal, targets: .zero,
+                            createdAt: profile?.createdAt ?? Date(), onboarded: true)
+        p.targets = NutritionMath.target(for: p)
+        apply(p)
+        await persist(p)
+    }
+
+    /// Dismiss onboarding without entering stats — keep the neutral default target (gentle, no nag).
+    func skipOnboarding() async {
+        await awaitReady()
+        var p = profile ?? .seed
+        p.onboarded = true
+        apply(p)
+        await persist(p)
+    }
+
+    private func persist(_ p: UserProfile) async {
+        guard backend == .firestore, let uid = Auth.auth().currentUser?.uid else { return }
+        try? Firestore.firestore().collection("users").document(uid).setData(from: p, merge: true)
     }
 
     // MARK: - Reads
