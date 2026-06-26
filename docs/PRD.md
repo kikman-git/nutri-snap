@@ -118,7 +118,13 @@ RevenueCat local state may improve UI speed, but backend Firestore entitlement i
 the source of truth for scan access.
 
 ### 5.2 Capture / scan loop — *the core*
-1. **Home = a large camera viewfinder** (the dominant UI).
+> **Updated 2026-06-26 (Warm Bloom D4 — home-first):** the Snap tab now opens to **Today·Home**
+> (a calm landing — today's kcal ring, meals, and a gap teaser), **not** a full-screen viewfinder.
+> The **raised center FAB launches the camera**; the capture flow (viewfinder → review → analyze →
+> logged) runs inline on the Snap tab with the tab bar + FAB still visible. This supersedes the
+> original "Home = a large camera viewfinder" below; the rest of the loop is unchanged.
+
+1. **Home = Today·Home**; the raised center FAB opens the camera viewfinder (D4 above).
 2. Snap a photo (or pick from library).
 3. App compresses the image.
 4. App asks the backend to start a scan.
