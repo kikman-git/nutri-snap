@@ -18,8 +18,7 @@ struct RootView: View {
     /// Screenshot hook: present the paywall on launch (the CLI can't tap Settings → Upgrade or
     /// exhaust the free quota). Pair with `REVENUECAT_API_KEY` to render live offerings.
     @State private var forcePaywall: Bool = false
-    /// TEMP Phase-0 hook: GALLERY=1 shows the Warm Bloom component gallery. Remove after Phase 1.
-    @State private var showGallery: Bool = false
+    @State private var breathing = false
     @Environment(\.scenePhase) private var scenePhase
 
     init(store: MealStore? = nil, estimator: MealEstimating? = nil) {
@@ -48,7 +47,6 @@ struct RootView: View {
         }
         _model = State(initialValue: CaptureViewModel(estimator: resolved))
         _forcePaywall = State(initialValue: env["FORCE_PAYWALL"] != nil)
-        _showGallery = State(initialValue: env["GALLERY"] != nil)
         // Test hook: `START_TAB=trends|calendar` opens straight to a tab (used for screenshots).
         switch env["START_TAB"] {
         case "trends":   _selection = State(initialValue: .trends)
@@ -63,7 +61,7 @@ struct RootView: View {
 
             screen(.trends)   { TrendsScreen() }
             screen(.snap)     { CaptureScreen(model: model) }
-            screen(.calendar) { CalendarScreen() }
+            screen(.calendar) { CalendarScreen(onSnap: { selection = .snap }) }
         }
         .safeAreaInset(edge: .bottom) { tabBar }
         .environment(store)
@@ -79,7 +77,6 @@ struct RootView: View {
         // Screenshot hook only (FORCE_PAYWALL): the production trigger is CaptureViewModel.confirm
         // raising the paywall on a quota/entitlement decline, plus the Settings upgrade row.
         .sheet(isPresented: $forcePaywall) { PaywallView().environment(SubscriptionStore.shared) }
-        .fullScreenCover(isPresented: $showGallery) { ComponentGallery() }   // TEMP Phase-0
         // Run the camera only while the Snap tab is showing; release it elsewhere.
         .task(id: selection) {
             if selection == .snap { await model.camera.start() } else { model.camera.stop() }
@@ -91,6 +88,8 @@ struct RootView: View {
             @unknown default:              break
             }
         }
+        .onAppear { updateBreathing() }
+        .onChange(of: shouldBreathe) { _, _ in updateBreathing() }
     }
 
     /// Keeps every tab mounted; only the selected one is visible + interactive.
@@ -105,31 +104,48 @@ struct RootView: View {
     private var tabBar: some View {
         ZStack {
             HStack(spacing: 0) {
-                sideTab(.trends, icon: "chart.bar.xaxis", label: "Trends")
+                sideTab(.trends, label: "Trends")
                 Spacer(minLength: 96)            // gap the camera button sits in
-                sideTab(.calendar, icon: "calendar", label: "Journal")
+                sideTab(.calendar, label: "Journal")
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.top, Theme.Spacing.sm)
+            .padding(.horizontal, 40)
+            .padding(.top, Theme.Spacing.md)
+            .padding(.bottom, Theme.Spacing.xs)
             .frame(maxWidth: .infinity)
             .background(
                 Theme.Palette.surface
-                    .shadow(color: Theme.Palette.ink.opacity(0.06), radius: 8, y: -2)
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(Theme.Palette.hairline).frame(height: 1)
+                    }
+                    .shadow(color: Theme.Shadow.warm.opacity(0.05), radius: 8, y: -3)
                     .ignoresSafeArea(edges: .bottom)
             )
 
-            cameraButton.offset(y: -18)
+            cameraButton.offset(y: -20)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)   // don't let the review keyboard lift the bar
     }
 
-    private func sideTab(_ tab: Tab, icon: String, label: String) -> some View {
-        Button { selection = tab } label: {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 20))
-                Text(label).font(.system(.caption2))
+    /// Custom 1.8-stroke keyline tabs (Trends wave · Journal book) — clay when active,
+    /// muted sage-taupe at rest (design §1.1).
+    private func sideTab(_ tab: Tab, label: String) -> some View {
+        let active = selection == tab
+        let color = active ? Theme.Palette.accent : Theme.Palette.tabInactive
+        let style = StrokeStyle(lineWidth: active ? 2 : 1.8, lineCap: .round, lineJoin: .round)
+        return Button { selection = tab } label: {
+            VStack(spacing: 5) {
+                Group {
+                    switch tab {
+                    case .trends:   BrandIcon.Trends().stroke(color, style: style)
+                    case .calendar: BrandIcon.Journal().stroke(color, style: style)
+                    case .snap:     EmptyView()
+                    }
+                }
+                .frame(width: 25, height: 25)
+                Text(label)
+                    .font(.custom("HankenGrotesk-SemiBold", size: 10))
+                    .foregroundStyle(color)
             }
-            .foregroundStyle(selection == tab ? Theme.Palette.accent : Theme.Palette.inkSecondary)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
@@ -140,35 +156,35 @@ struct RootView: View {
 
     private var onSnap: Bool { selection == .snap }
 
+    /// Breathe only while the viewfinder is idle on Snap — never mid-review / analysis.
+    private var shouldBreathe: Bool { onSnap && model.phase == .idle }
+
+    private func updateBreathing() {
+        if shouldBreathe {
+            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { breathing = true }
+        } else {
+            withAnimation(.easeOut(duration: 0.25)) { breathing = false }
+        }
+    }
+
+    /// Raised gradient FAB with a 4px surface ring + amber glow (design's center shutter).
     private var cameraButton: some View {
         Button(action: shutterTapped) {
             ZStack {
-                Circle()
-                    .fill(Theme.Palette.accent)
-                    .frame(width: 64, height: 64)
-                    .shadow(color: Theme.Palette.accent.opacity(0.4), radius: 8, y: 3)
-
                 if onSnap && model.phase == .analyzing {
-                    ProgressView().tint(Theme.Palette.surface)
+                    ProgressView().tint(.white)
                 } else {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.surface)
+                    BrandIcon.Camera()
+                        .stroke(.white, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, lineJoin: .round))
+                        .frame(width: 26, height: 26)
                 }
             }
-            // On the Snap tab, dress it as a shutter (inner + outer ring).
-            .overlay {
-                if onSnap {
-                    Circle().strokeBorder(Theme.Palette.surface.opacity(0.7), lineWidth: 2)
-                        .frame(width: 52, height: 52)
-                }
-            }
-            .overlay {
-                if onSnap {
-                    Circle().strokeBorder(Theme.Palette.background, lineWidth: 3)
-                        .frame(width: 72, height: 72)
-                }
-            }
+            .frame(width: 56, height: 56)
+            .background(Circle().fill(Theme.Gradient.primary))
+            .padding(4)
+            .background(Circle().fill(Theme.Palette.surface))   // 4px surface ring
+            .amberButtonShadow()
+            .scaleEffect(breathing ? 1.04 : 1)
             .opacity(onSnap && model.phase == .reviewing ? 0.45 : 1)   // review owns the on-screen buttons
         }
         .buttonStyle(.plain)

@@ -42,11 +42,6 @@ struct PaywallView: View {
                     Button { dismiss() } label: { Image(systemName: "xmark") }
                         .tint(Theme.Palette.inkSecondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Restore") { Task { await restore() } }
-                        .tint(Theme.Palette.inkSecondary)
-                        .disabled(subscriptions.actionInFlight)
-                }
             }
         }
         .task {
@@ -67,43 +62,41 @@ struct PaywallView: View {
 
     private var hero: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "leaf.fill")
-                .font(.system(size: 44))
+            MicroBloom(petals: MicroBloom.petals(
+                values:     [0.62, 0.82, 0.5, 0.62, 0.72, 0.86, 0.46],
+                references: Array(repeating: 1, count: 7)))
+                .frame(width: 104, height: 104)
+            Text("Nutri Snap Plus")
+                .font(Theme.Typography.overline).tracking(2).textCase(.uppercase)
                 .foregroundStyle(Theme.Palette.accent)
-            Text("Nutri Snap Premium")
-                .font(Theme.Typography.screenTitle)
+            Text("See the full picture\nof every meal")
+                .font(Theme.Typography.title)
                 .foregroundStyle(Theme.Palette.ink)
-            Text("Keep snapping — and let your gentle coach watch the long game with you.")
-                .font(Theme.Typography.body)
-                .foregroundStyle(Theme.Palette.inkSecondary)
                 .multilineTextAlignment(.center)
+            Text("a calmer, more complete read").accentLine()
         }
         .padding(.top, Theme.Spacing.sm)
     }
 
     private var benefits: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            benefit("infinity", "Unlimited meal scans", "Snap every meal, every day — no counting.")
-            benefit("chart.line.uptrend.xyaxis", "Full nutrient trends", "Protein, fiber, omega-3 and more, tracked over time.")
-            benefit("sparkles", "Weekly reflections", "A warm, AI-written look back at how your week went.")
+            benefit("Unlimited meal snaps")
+            benefit("Full micronutrient bloom & trends")
+            benefit("Fill the gaps food suggestions")
+            benefit("Weekly reflections")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func benefit(_ icon: String, _ title: String, _ subtitle: String) -> some View {
-        HStack(alignment: .top, spacing: Theme.Spacing.md) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(Theme.Palette.accent)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(Theme.Typography.body.weight(.semibold))
-                    .foregroundStyle(Theme.Palette.ink)
-                Text(subtitle)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Palette.inkSecondary)
-            }
+    private func benefit(_ title: String) -> some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.Palette.sageText)
+                .frame(width: 26, height: 26)
+                .background(Theme.Palette.sageTintBg, in: Circle())
+            Text(title).font(Theme.Typography.body).foregroundStyle(Theme.Palette.ink)
+            Spacer(minLength: 0)
         }
     }
 
@@ -116,57 +109,59 @@ struct PaywallView: View {
     private func planCard(_ package: Package) -> some View {
         let isSelected = selected?.identifier == package.identifier
         return Button { selected = package } label: {
-            HStack(spacing: Theme.Spacing.md) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Text(planTitle(package))
-                            .font(Theme.Typography.body.weight(.semibold))
-                            .foregroundStyle(Theme.Palette.ink)
-                        if let percent = annualSavings(package) {
-                            Text("Save \(percent)%")
-                                .font(.system(.caption2).weight(.bold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Theme.Palette.accent, in: Capsule())
-                                .foregroundStyle(Theme.Palette.surface)
-                        }
-                    }
-                    Text(priceLine(package))
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.inkSecondary)
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(planTitle(package)).font(Theme.Typography.headline).foregroundStyle(Theme.Palette.ink)
+                    Text(billingLine(package)).font(Theme.Typography.caption).foregroundStyle(Theme.Palette.inkSecondary)
                 }
                 Spacer()
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? Theme.Palette.accent
-                                                : Theme.Palette.inkSecondary.opacity(0.4))
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(package.storeProduct.localizedPriceString)
+                        .font(Theme.Typography.numeral(20)).foregroundStyle(Theme.Palette.ink)
+                    Text("per \(periodLabel(package.storeProduct.subscriptionPeriod))")
+                        .font(Theme.Typography.caption).foregroundStyle(Theme.Palette.inkSecondary)
+                }
             }
             .padding(Theme.Spacing.md)
             .background(Theme.Palette.surface,
-                        in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
-                    .strokeBorder(isSelected ? Theme.Palette.accent : .clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous)
+                    .strokeBorder(isSelected ? Theme.Palette.accent : Theme.Palette.hairline,
+                                  lineWidth: isSelected ? 2 : 1.5)
             )
+            .overlay(alignment: .topLeading) {
+                if let percent = annualSavings(package) {
+                    Text("Best value · save \(percent)%")
+                        .font(.custom("HankenGrotesk-Bold", size: 10)).tracking(0.4).textCase(.uppercase)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10).padding(.vertical, 3)
+                        .background(Theme.Palette.accent, in: Capsule())
+                        .offset(x: 14, y: -9)
+                }
+            }
         }
         .buttonStyle(.plain)
     }
 
+    private func billingLine(_ package: Package) -> String {
+        switch package.packageType {
+        case .annual:  return "billed yearly"
+        case .monthly: return "billed monthly"
+        case .weekly:  return "billed weekly"
+        default:       return priceLine(package)
+        }
+    }
+
     private var cta: some View {
         Button { Task { await buy() } } label: {
-            Group {
-                if subscriptions.actionInFlight {
-                    ProgressView().tint(Theme.Palette.surface)
-                } else {
-                    Text(ctaTitle).font(Theme.Typography.body.weight(.semibold))
-                }
+            if subscriptions.actionInFlight {
+                ProgressView().tint(.white)
+            } else {
+                Text(ctaTitle)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Spacing.md)
-            .background(Theme.Palette.accent, in: Capsule())
-            .foregroundStyle(Theme.Palette.surface)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.primary)
         .disabled(subscriptions.actionInFlight || selected == nil)
     }
 
@@ -177,6 +172,9 @@ struct PaywallView: View {
                 .foregroundStyle(Theme.Palette.inkSecondary)
                 .multilineTextAlignment(.center)
             HStack(spacing: Theme.Spacing.md) {
+                Button("Restore") { Task { await restore() } }
+                    .disabled(subscriptions.actionInFlight)
+                Text("·").foregroundStyle(Theme.Palette.inkSecondary)
                 Link("Terms", destination: PaywallLinks.terms)
                 Text("·").foregroundStyle(Theme.Palette.inkSecondary)
                 Link("Privacy", destination: PaywallLinks.privacy)

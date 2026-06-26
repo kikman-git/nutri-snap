@@ -201,9 +201,16 @@ These recur across many screens; build once:
 
 ---
 
-## Phase 1 · Restyle existing screens (no model change)
+## Phase 1 · Restyle existing screens (no model change) — ✅ DONE (2026-06-26)
 
-Each is a styling pass once Phase 0 lands. Listed with design ref → target file → the concrete changes.
+**All of §1.1–1.8 implemented + verified on the iPhone 16 Plus sim** against the imported design
+(`Nutri Snap - Warm Bloom.dc.html`). Two new components landed (`Theme/Components/EnergyRibbon.swift`,
+`BrandIcons.swift`); `EnergyShape.tint`/`labelColor` added to `Theme.swift`; the review step now
+overrides `MealSlot` via `asEntry(slot:)`; `MicroBloom` got a gentle √-curve so low shares still read.
+The `GALLERY=1` temp gallery + `_ComponentGallery.swift` are removed. Phase-2 viz (MicroBloom,
+ConicRing dials, area sparkline) folded in early since the components existed. Caveats: the Paywall
+plan cards need a live RevenueCat offering and the Reflect sheet needs an AI call, so both are
+code-complete but not screenshot-verified headlessly. Each is a styling pass once Phase 0 lands.
 
 ### 1.1 `App/RootView.swift` — tab bar + FAB
 - FAB → gradient fill, amber-glow shadow, 4px surface ring, gentle `scale` breathe when idle on Snap.

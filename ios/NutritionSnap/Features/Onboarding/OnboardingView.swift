@@ -36,20 +36,11 @@ struct OnboardingView: View {
 
     private var buttons: some View {
         VStack(spacing: Theme.Spacing.md) {
-            Button(action: useTarget) {
-                Text("Use this target")
-                    .font(Theme.Typography.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Theme.Palette.accent,
-                                in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
-                    .foregroundStyle(Theme.Palette.surface)
-            }
-            .disabled(saving)
-
+            Button("Use this target", action: useTarget)
+                .buttonStyle(.primary)
+                .disabled(saving)
             Button("Skip for now") { saving = true; Task { await store.skipOnboarding() } }
-                .font(Theme.Typography.body)
-                .foregroundStyle(Theme.Palette.inkSecondary)
+                .buttonStyle(.ghost(muted: true))
                 .disabled(saving)
         }
         .padding(.top, Theme.Spacing.sm)

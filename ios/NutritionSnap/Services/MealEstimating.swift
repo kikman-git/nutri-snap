@@ -69,7 +69,8 @@ struct EstimatedMeal: Codable, Hashable {
 
     /// The real captured photo is carried alongside the `Entry` (Models stay UIKit-free),
     /// so `photoSymbol` is left nil here — the camera path supplies the actual image.
-    func asEntry(capturedAt: Date = Date()) -> Entry {
+    /// `slot` lets the review step's "When" chips override the hour-derived default (D3).
+    func asEntry(capturedAt: Date = Date(), slot: MealSlot? = nil) -> Entry {
         Entry(capturedAt: capturedAt,
               source: source,
               edited: false,
@@ -79,7 +80,7 @@ struct EstimatedMeal: Codable, Hashable {
               balanceNote: balanceNote,
               photoSymbol: nil,
               energy: energy,
-              mealSlot: MealSlot.default(for: capturedAt))
+              mealSlot: slot ?? MealSlot.default(for: capturedAt))
     }
 }
 

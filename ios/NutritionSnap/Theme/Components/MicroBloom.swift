@@ -43,7 +43,8 @@ struct MicroBloom: View {
     private func petalView(index: Int, petal: Petal, center: CGPoint, maxR: CGFloat) -> some View {
         let n = Double(max(petals.count, 1))
         let theta = Double(index) / n * 2 * .pi - .pi / 2
-        let frac = max(min(petal.fraction, 1), minFraction)
+        // Gentle power curve so low shares still read as a bloom (decorative emblem, not a precise bar).
+        let frac = max(pow(max(min(petal.fraction, 1), 0), 0.6), minFraction)
         let length = maxR * CGFloat(frac)
         let x = center.x + CGFloat(cos(theta)) * length / 2
         let y = center.y + CGFloat(sin(theta)) * length / 2

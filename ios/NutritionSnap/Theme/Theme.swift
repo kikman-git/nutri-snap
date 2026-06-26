@@ -18,6 +18,9 @@ enum Theme {
         // Fills
         static let honey        = Color("Honey")
         static let hairline     = Color("Hairline")
+        /// Resting tab-bar icon — a muted sage-taupe (#B8AC99), lighter than `inkSecondary`.
+        /// Code-defined (single use); promote to a colorset if it spreads.
+        static let tabInactive  = Color(red: 184/255, green: 172/255, blue: 153/255)
         static let sageTintBg   = Color("SageTintBg")    // pale sage chip / under-cell fill
         static let sageText     = Color("SageText")      // text on sage-tint
         static let amberTintBg  = Color("AmberTintBg")   // secondary-button fill
@@ -172,6 +175,27 @@ extension DayBand {
         case .inRange: return "On track"
         case .over:    return "Fuller"
         case .none:    return "—"
+        }
+    }
+}
+
+extension EnergyShape {
+    /// Semantic tint for the energy ribbon / dot — sage (calm) → amber → clay. Never red:
+    /// "quick rise" is the warmest, but caution lives in clay, not alarm (PRD constraint).
+    var tint: Color {
+        switch self {
+        case .steady:     return Theme.Palette.sage
+        case .gentleRise: return Theme.Palette.bandOver   // soft amber
+        case .spike:      return Theme.Palette.accent     // clay
+        }
+    }
+
+    /// Text color for the label beside the ribbon (slightly deeper than the line tint).
+    var labelColor: Color {
+        switch self {
+        case .steady:     return Theme.Palette.sageText
+        case .gentleRise: return Theme.Palette.accent
+        case .spike:      return Theme.Palette.accent
         }
     }
 }

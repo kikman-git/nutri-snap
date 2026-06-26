@@ -2,16 +2,13 @@ import SwiftUI
 import UIKit
 import PhotosUI
 
-/// Home tab (PRD §5.2): a live camera viewfinder → a calm **review** step (add a note) →
-/// "reading…" → auto-logged card. The shutter is the raised nav-bar button (`RootView`);
-/// this screen owns the viewfinder, the review panel, the result states, and the quiet
-/// "choose from library" fallback. The `CaptureViewModel` (+ its `CameraSession`) is owned by `RootView`.
 struct CaptureScreen: View {
     @Environment(MealStore.self) private var store
     let model: CaptureViewModel
     @State private var pickerItem: PhotosPickerItem?
     @FocusState private var noteFocused: Bool
     @State private var editingEntry: Entry?
+    @State private var spin = false
 
     private let clip = RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
 
@@ -19,21 +16,13 @@ struct CaptureScreen: View {
         @Bindable var model = model
         return ZStack {
             Theme.Palette.background.ignoresSafeArea()
-                .onTapGesture { noteFocused = false }       // tap the field away
+                .onTapGesture { noteFocused = false }
 
             ScrollView {
-                VStack(spacing: Theme.Spacing.lg) {
-                    viewfinder
-                    if model.phase == .reviewing {
-                        reviewPanel
-                    } else {
-                        controls.frame(height: 60)          // fixed height so phases don't shift the layout
-                        resultCard
-                    }
-                }
-                .padding(Theme.Spacing.lg)
-                .animation(.easeInOut(duration: 0.25), value: model.phase)
-                .animation(.easeInOut(duration: 0.25), value: model.camera.status)
+                content
+                    .padding(Theme.Spacing.lg)
+                    .animation(.easeInOut(duration: 0.25), value: model.phase)
+                    .animation(.easeInOut(duration: 0.25), value: model.camera.status)
             }
             .scrollDismissesKeyboard(.interactively)
         }
@@ -53,24 +42,15 @@ struct CaptureScreen: View {
                 model.replaceLoggedEntry(edited)
             }
         }
-        // Quota/entitlement decline raised the paywall (CaptureViewModel.confirm). The staged photo
-        // + note are kept, so after a successful purchase they just tap Analyze again.
         .sheet(isPresented: $model.showPaywall) {
-            // Re-inject explicitly: top-level sheets don't reliably inherit @Observable env objects
-            // on this SDK (same reason OnboardingView re-injects the store).
             PaywallView().environment(SubscriptionStore.shared)
         }
         .task {
-            // Headless screenshot hooks (mirror RootView's START_TAB): the picker, the live camera,
-            // and the keyboard can't be driven from the CLI. AUTO_CAPTURE/AUTO_CAPTURE_FOOD run the
-            // full review→confirm path; AUTO_REVIEW stops on the review step so it can be captured.
             let env = ProcessInfo.processInfo.environment
             if env["AUTO_CAPTURE_FOOD"] != nil, let food = Self.documentImage("test_meal.jpg") {
                 model.review(food); await model.confirm(into: store)
             } else if env["AUTO_CAPTURE"] != nil {
                 model.review(Self.placeholderImage); await model.confirm(into: store)
-                // AUTO_EDIT opens the edit sheet on the fresh log (pair with AUTO_EDIT_SAVE in
-                // MealEditSheet to apply a canned correction — the CLI can't type or tap).
                 if env["AUTO_EDIT"] != nil { editingEntry = model.entry }
             } else if env["AUTO_REVIEW"] != nil {
                 model.review(Self.placeholderImage)
@@ -79,205 +59,289 @@ struct CaptureScreen: View {
         }
     }
 
-    // MARK: - Viewfinder (switches on phase)
+    // MARK: - Phase router
 
-    @ViewBuilder private var viewfinder: some View {
+    @ViewBuilder private var content: some View {
         switch model.phase {
-        case .idle:
-            liveViewfinder(showingGuides: true)
-        case .reviewing:
-            box(background: Theme.Palette.ink.opacity(0.9)) {
-                if let image = model.image {
-                    Image(uiImage: image).resizable().scaledToFill()
-                }
-            }
-        case .logged:
-            // Show the shot just logged above its nutrition breakdown — the magic moment. Capped
-            // height (not the full viewfinder) so the breakdown card fits without crowding.
-            if let image = model.image {
-                Image(uiImage: image).resizable().scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 260)
-                    .clipShape(clip)
-            } else {
-                liveViewfinder(showingGuides: false)
-            }
-        case .analyzing:
-            box(background: Theme.Palette.ink.opacity(0.04)) {
-                ZStack {
-                    if let image = model.image {
-                        Image(uiImage: image).resizable().scaledToFill().opacity(0.45)
-                    }
-                    VStack(spacing: Theme.Spacing.sm) {
-                        ProgressView().tint(Theme.Palette.accent)
-                        Text("Reading your meal…")
-                            .font(Theme.Typography.sectionTitle)
-                            .foregroundStyle(Theme.Palette.ink)
-                    }
-                }
-            }
+        case .idle:      idleView
+        case .reviewing: reviewView
+        case .analyzing: analyzingView
+        case .logged:    loggedView
         case .notFood:
-            box {
-                prompt(icon: "leaf",
-                       title: "No meal spotted",
-                       subtitle: model.message ?? "Hmm, I couldn't find a meal here.")
-            }
+            couldntRead(title: "No meal spotted",
+                        accent: "we couldn't find a meal here",
+                        subtitle: model.message ?? "Try a photo of your plate — or just tell us what it was.")
         case .failed:
-            box {
-                prompt(icon: "cloud",
-                       title: "Couldn't read that",
-                       subtitle: model.message ?? "Mind trying again?")
-            }
+            couldntRead(title: "Hmm, that's a tricky one",
+                        accent: "we couldn't quite read this plate",
+                        subtitle: model.message ?? "Try a photo from above with the whole plate in frame.")
         }
     }
 
-    /// The live feed when the camera is running, or a gentle fallback that points at the library.
-    @ViewBuilder private func liveViewfinder(showingGuides: Bool) -> some View {
+    // MARK: - Idle (viewfinder + library + most-recent)
+
+    @ViewBuilder private var idleView: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            liveViewfinder
+            libraryControl
+            if let recent = store.recentEntry { RecentMealRow(entry: recent) }
+        }
+    }
+
+    @ViewBuilder private var liveViewfinder: some View {
         switch model.camera.status {
         case .ready:
-            box(background: Theme.Palette.ink.opacity(0.9)) {
+            box(background: Theme.Palette.ink) {
                 ZStack {
                     CameraPreview(session: model.camera.session)
-                    if showingGuides { ViewfinderGuides() }
+                    ViewfinderGuides()
+                    VStack {
+                        Spacer()
+                        Text("snap your plate, that's all")
+                            .font(Theme.Typography.accent)
+                            .foregroundStyle(.white)
+                        Text("we'll read the calories, macros and micros")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.bottom, Theme.Spacing.lg)
+                    }
+                    .multilineTextAlignment(.center)
                 }
             }
         case .configuring:
-            box {
-                ZStack {
-                    clip.strokeBorder(Theme.Palette.accent.opacity(0.25),
-                                      style: StrokeStyle(lineWidth: 1.5, dash: [7, 6]))
-                    prompt(icon: "camera.viewfinder", title: "Starting camera…", subtitle: nil)
-                }
-            }
+            fallbackBox(icon: "camera.viewfinder", title: "Starting camera…",
+                        accent: "one moment")
         case .denied:
-            box {
-                prompt(icon: "camera.fill",
-                       title: "Camera access is off",
-                       subtitle: "Turn it on in Settings — or choose a photo from your library below.")
-            }
+            fallbackBox(icon: "camera.fill", title: "Camera access is off",
+                        accent: "turn it on in Settings, or pick from your library")
         case .unavailable:
-            box {
-                ZStack {
-                    clip.strokeBorder(Theme.Palette.accent.opacity(0.25),
-                                      style: StrokeStyle(lineWidth: 1.5, dash: [7, 6]))
-                    prompt(icon: "photo.on.rectangle.angled",
-                           title: "Snap your meal",
-                           subtitle: "No camera here — choose a photo from your library below.")
+            fallbackBox(icon: "photo.on.rectangle.angled", title: "Snap your meal",
+                        accent: "choose a photo and we'll read the rest")
+        }
+    }
+
+    private func fallbackBox(icon: String, title: String, accent: String) -> some View {
+        box(background: Theme.Palette.surface) {
+            ZStack {
+                clip.strokeBorder(Theme.Palette.accent.opacity(0.22),
+                                  style: StrokeStyle(lineWidth: 1.5, dash: [7, 6]))
+                VStack(spacing: Theme.Spacing.sm) {
+                    illustration(icon)
+                    Text(title).font(Theme.Typography.title).foregroundStyle(Theme.Palette.ink)
+                    Text(accent).accentLine().multilineTextAlignment(.center)
                 }
+                .padding(Theme.Spacing.lg)
             }
         }
     }
 
-    // MARK: - Review panel (add a note, then analyze)
-
-    private var reviewPanel: some View {
-        @Bindable var model = model
-        return VStack(spacing: Theme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Add a note (optional)")
-                    .font(Theme.Typography.caption)
+    @ViewBuilder private var libraryControl: some View {
+        if model.camera.status == .ready {
+            PhotosPicker(selection: $pickerItem, matching: .images, photoLibrary: .shared()) {
+                Label("Choose from library", systemImage: "photo.on.rectangle")
+                    .font(Theme.Typography.label)
                     .foregroundStyle(Theme.Palette.inkSecondary)
-                TextField("e.g. homemade, cooked in olive oil, large bowl",
-                          text: $model.note, axis: .vertical)
+            }
+        } else {
+            PhotosPicker(selection: $pickerItem, matching: .images, photoLibrary: .shared()) {
+                primaryPill("Choose from library", icon: "photo.on.rectangle")
+            }
+        }
+    }
+
+    // MARK: - Review (slot + note → analyze)
+
+    private var reviewView: some View {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack(spacing: Theme.Spacing.md) {
+                circleButton("xmark") { model.retake() }
+                Text("Looks good?").font(Theme.Typography.title).foregroundStyle(Theme.Palette.ink)
+            }
+
+            ZStack(alignment: .bottomLeading) {
+                if let image = model.image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                        .frame(height: 240).frame(maxWidth: .infinity).clipped()
+                }
+                Chip(text: "Looks like a full plate", systemImage: "checkmark", variant: .sageTint)
+                    .padding(Theme.Spacing.md)
+            }
+            .clipShape(clip)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                SectionEyebrow(text: "When")
+                HStack(spacing: Theme.Spacing.sm) {
+                    ForEach(MealSlot.allCases) { slot in
+                        Button { model.selectedSlot = slot } label: {
+                            slotChip(slot.label, selected: model.selectedSlot == slot)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.top, Theme.Spacing.xs)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack(spacing: 4) {
+                    SectionEyebrow(text: "How did it feel?")
+                    Text("optional").font(Theme.Typography.caption).foregroundStyle(Theme.Palette.inkSecondary)
+                }
+                TextField("a satisfying lunch…", text: $model.note, axis: .vertical)
                     .lineLimit(1...3)
                     .focused($noteFocused)
                     .font(Theme.Typography.body)
                     .foregroundStyle(Theme.Palette.ink)
                     .padding(Theme.Spacing.md)
                     .background(Theme.Palette.surface,
-                                in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.input)
+                        .strokeBorder(Theme.Palette.hairline, lineWidth: 1.5))
             }
+            .padding(.top, Theme.Spacing.xs)
 
-            // Gentle hint when a fresh subscription is still activating (webhook lag) — shown on the
-            // review step so they know to retry without seeing the paywall again.
             if let message = model.message {
-                Text(message)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Palette.accent)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(message).font(Theme.Typography.caption).foregroundStyle(Theme.Palette.accent)
             }
 
-            HStack(spacing: Theme.Spacing.md) {
-                Button { model.retake() } label: {
-                    Text("Retake")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .background(Theme.Palette.surface, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Theme.Palette.inkSecondary.opacity(0.2)))
-                        .foregroundStyle(Theme.Palette.inkSecondary)
-                }
-                Button {
-                    noteFocused = false
-                    Task { await model.confirm(into: store) }
-                } label: {
-                    Label("Analyze", systemImage: "sparkles")
-                        .font(Theme.Typography.body.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .background(Theme.Palette.accent, in: Capsule())
-                        .foregroundStyle(Theme.Palette.surface)
+            Button("Read this meal") {
+                noteFocused = false
+                Task { await model.confirm(into: store) }
+            }
+            .buttonStyle(.primary)
+            .padding(.top, Theme.Spacing.sm)
+        }
+    }
+
+    // MARK: - Analyzing
+
+    private var analyzingView: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            Spacer(minLength: Theme.Spacing.xxl)
+            ZStack {
+                Circle().stroke(Theme.Palette.bandEmpty, lineWidth: 5)
+                Circle().trim(from: 0, to: 0.4)
+                    .stroke(Theme.Palette.bandOver, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .rotationEffect(.degrees(spin ? 360 : 0))
+                    .animation(.linear(duration: 1.1).repeatForever(autoreverses: false), value: spin)
+                if let image = model.image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                        .frame(width: 140, height: 140).clipShape(Circle())
                 }
             }
-            .font(Theme.Typography.body)
+            .frame(width: 188, height: 188)
+
+            Text("Reading your plate").font(Theme.Typography.title).foregroundStyle(Theme.Palette.ink)
+            Text("finding the good stuff…").accentLine()
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                checkRow("Identified the foods", done: true)
+                checkRow("Estimated portions", done: true)
+                checkRow("Calculating nutrients", done: false)
+            }
+            .padding(.top, Theme.Spacing.md)
+            Spacer(minLength: Theme.Spacing.xxl)
+        }
+        .frame(maxWidth: .infinity)
+        .onAppear { spin = true }
+    }
+
+    private func checkRow(_ text: String, done: Bool) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            ZStack {
+                if done {
+                    Circle().fill(Theme.Palette.sage)
+                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                } else {
+                    Circle().strokeBorder(Theme.Palette.bandEmpty, lineWidth: 2)
+                }
+            }
+            .frame(width: 22, height: 22)
+            Text(text)
+                .font(Theme.Typography.label)
+                .foregroundStyle(done ? Theme.Palette.sageText : Theme.Palette.inkSecondary)
+                .opacity(done ? 1 : 0.7)
+        }
+    }
+
+    // MARK: - Logged hero
+
+    @ViewBuilder private var loggedView: some View {
+        if let entry = model.entry ?? store.recentEntry {
+            LoggedHeroCard(entry: entry,
+                           image: model.image,
+                           references: store.references,
+                           dailyKcal: store.target.kcal,
+                           onEdit: { editingEntry = entry },
+                           onDelete: { Task { await store.delete(entry); model.reset() } })
+        }
+    }
+
+    // MARK: - Couldn't read it
+
+    private func couldntRead(title: String, accent: String, subtitle: String) -> some View {
+        VStack(spacing: Theme.Spacing.md) {
+            HStack { circleButton("xmark") { model.reset() }; Spacer() }
+            Spacer(minLength: Theme.Spacing.xl)
+            illustration("fork.knife", large: true)
+            Text(title).font(Theme.Typography.title).foregroundStyle(Theme.Palette.ink)
+            Text(accent).accentLine()
+            Text(subtitle)
+                .font(Theme.Typography.body).foregroundStyle(Theme.Palette.inkSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.Spacing.lg)
+            Spacer(minLength: Theme.Spacing.xl)
+            PhotosPicker(selection: $pickerItem, matching: .images, photoLibrary: .shared()) {
+                primaryPill("Try another photo", icon: "camera")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+    }
+
+    // MARK: - Small shared bits
+
+    private func primaryPill(_ title: String, icon: String? = nil) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            if let icon { Image(systemName: icon) }
+            Text(title)
+        }
+        .font(Theme.Typography.label)
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Theme.Gradient.primary, in: Capsule())
+        .amberButtonShadow()
+    }
+
+    private func slotChip(_ label: String, selected: Bool) -> some View {
+        Text(label)
+            .font(Theme.Typography.label)
+            .foregroundStyle(selected ? .white : Theme.Palette.inkSecondary)
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(selected ? Theme.Palette.accent : Theme.Palette.background, in: Capsule())
+            .overlay { if !selected { Capsule().strokeBorder(Theme.Palette.hairline, lineWidth: 1.5) } }
+    }
+
+    private func circleButton(_ icon: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.Palette.inkSecondary)
+                .frame(width: 38, height: 38)
+                .background(Theme.Palette.surface, in: Circle())
+                .overlay(Circle().strokeBorder(Theme.Palette.hairline, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Controls (library picker; shutter lives in the nav bar)
-
-    @ViewBuilder private var controls: some View {
-        switch model.phase {
-        case .idle, .logged:
-            // Quiet when the camera is the primary path; promoted to a filled CTA when it isn't.
-            if model.camera.status == .ready {
-                picker {
-                    Label("Choose from library", systemImage: "photo.on.rectangle")
-                        .font(Theme.Typography.body)
-                        .foregroundStyle(Theme.Palette.inkSecondary)
-                }
-            } else {
-                picker { filledCTA("Choose from library") }
-            }
-        case .notFood, .failed:
-            picker { filledCTA("Try another photo") }
-        case .reviewing, .analyzing:
-            Color.clear                                   // handled elsewhere / hold the layout steady
-        }
+    private func illustration(_ icon: String, large: Bool = false) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: large ? 52 : 40, weight: .light))
+            .foregroundStyle(Theme.Palette.accent)
+            .frame(width: large ? 150 : 112, height: large ? 150 : 112)
+            .background(Theme.Palette.amberTintBg, in: Circle())
     }
-
-    private func picker<Label: View>(@ViewBuilder label: () -> Label) -> some View {
-        PhotosPicker(selection: $pickerItem, matching: .images, photoLibrary: .shared()) {
-            label()
-        }
-    }
-
-    private func filledCTA(_ title: String) -> some View {
-        Text(title)
-            .font(Theme.Typography.body.weight(.semibold))
-            .foregroundStyle(Theme.Palette.surface)
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
-            .background(Theme.Palette.accent, in: Capsule())
-    }
-
-    // MARK: - Result card
-
-    @ViewBuilder private var resultCard: some View {
-        if model.phase == .logged, let entry = model.entry ?? store.recentEntry {
-            // Fresh log: full nutrition breakdown + a quiet way to remove it.
-            RecentLogCard(entry: entry,
-                          image: model.image,
-                          expanded: true,
-                          onRemove: {
-                              Task { await store.delete(entry); model.reset() }
-                          },
-                          onEdit: { editingEntry = entry })
-        } else if model.phase == .idle, let recent = store.recentEntry {
-            RecentLogCard(entry: recent, image: nil)
-        }
-    }
-
-    // MARK: - Helpers
 
     private func box<Content: View>(background: Color = Theme.Palette.surface,
                                     @ViewBuilder content: () -> Content) -> some View {
@@ -289,38 +353,17 @@ struct CaptureScreen: View {
             .clipShape(clip)
     }
 
-    private func prompt(icon: String, title: String, subtitle: String?) -> some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: icon)
-                .font(.system(size: 52, weight: .light))
-                .foregroundStyle(Theme.Palette.accent)
-            Text(title)
-                .font(Theme.Typography.sectionTitle)
-                .foregroundStyle(Theme.Palette.ink)
-            if let subtitle {
-                Text(subtitle)
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(Theme.Palette.inkSecondary)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding(Theme.Spacing.lg)
-    }
-
     private func loadAndReview(_ item: PhotosPickerItem) async {
         guard let data = try? await item.loadTransferable(type: Data.self),
               let image = DownsampledImage.make(from: data, maxDimension: 1600) else { return }
         model.review(image)
     }
 
-    /// Loads an image dropped into the app's Documents (the AUTO_CAPTURE_FOOD live-path test hook).
     static func documentImage(_ name: String) -> UIImage? {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return DownsampledImage.make(fromFile: docs.appendingPathComponent(name), maxDimension: 1600)
     }
 
-    /// Stand-in "photo" for the AUTO_CAPTURE screenshot path (no real photo needed):
-    /// a warm clay field with a meal glyph so the viewfinder/thumbnail read as a captured image.
     static var placeholderImage: UIImage {
         let size = CGSize(width: 600, height: 800)
         return UIGraphicsImageRenderer(size: size).image { _ in
@@ -336,7 +379,6 @@ struct CaptureScreen: View {
     }
 }
 
-/// Four faint corner brackets — a calm "viewfinder" cue over the live feed.
 private struct ViewfinderGuides: View {
     var body: some View {
         GeometryReader { geo in
@@ -346,13 +388,11 @@ private struct ViewfinderGuides: View {
                               width: geo.size.width - inset * 2,
                               height: geo.size.height - inset * 2)
             Path { p in
-                for corner in [true, false] {            // top edge, then bottom edge
+                for corner in [true, false] {
                     let y = corner ? rect.minY : rect.maxY
                     let dy: CGFloat = corner ? len : -len
-                    // left
                     p.move(to: CGPoint(x: rect.minX, y: y + dy)); p.addLine(to: CGPoint(x: rect.minX, y: y))
                     p.addLine(to: CGPoint(x: rect.minX + len, y: y))
-                    // right
                     p.move(to: CGPoint(x: rect.maxX - len, y: y)); p.addLine(to: CGPoint(x: rect.maxX, y: y))
                     p.addLine(to: CGPoint(x: rect.maxX, y: y + dy))
                 }
@@ -364,139 +404,200 @@ private struct ViewfinderGuides: View {
     }
 }
 
-/// Auto-logged result as a warm summary card with a *quiet* edit affordance (PRD §5.2):
-/// frictionless for the 80%, correctable for the 20%. Shows the real captured photo when
-/// present; falls back to an SF Symbol for sample data.
-private struct RecentLogCard: View {
+// MARK: - Logged hero card
+
+private struct LoggedHeroCard: View {
     let entry: Entry
     var image: UIImage?
-    /// Fresh-log card: show the full macro + micro breakdown and a quiet Remove button.
-    var expanded: Bool = false
-    var onRemove: (() -> Void)? = nil
-    var onEdit: (() -> Void)? = nil
+    let references: NutrientAmounts
+    let dailyKcal: Double
+    var onEdit: () -> Void
+    var onDelete: () -> Void
+
+    private let bloomMicros: [Nutrient] = [.iron, .zinc, .magnesium, .potassium, .vitaminA, .vitaminC, .fiber]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            header
-            if expanded {
-                Rectangle().fill(Theme.Palette.inkSecondary.opacity(0.12)).frame(height: 1)
-                MealNutrition(entry: entry)
-            }
+            banner
+            kcalRow
+            if let energy = entry.energy { energyCard(energy) }
+            bloomCard
+            if !lowMicros.isEmpty { gapsNudge }
+            actions
         }
-        .padding(Theme.Spacing.md)
-        .background(Theme.Palette.surface,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
     }
 
-    private var header: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            thumbnail
+    private var banner: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    MealPhoto(path: entry.photoPath, symbol: entry.photoSymbol ?? "fork.knife")
+                }
+            }
+            .frame(height: 152).frame(maxWidth: .infinity).clipped()
+
+            LinearGradient(colors: [.clear, Theme.Palette.ink.opacity(0.62)],
+                           startPoint: .center, endPoint: .bottom)
+                .frame(height: 152)
 
             VStack(alignment: .leading, spacing: 2) {
-                if entry.isLowConfidence {
-                    Text("Tap to confirm what this was")          // invite, don't assert
-                        .font(Theme.Typography.body)
+                Text("✓ Logged · just now")
+                    .font(Theme.Typography.overline).tracking(2).textCase(.uppercase)
+                    .foregroundStyle(.white.opacity(0.85))
+                Text(mealName).font(Theme.Typography.title).foregroundStyle(.white)
+            }
+            .padding(Theme.Spacing.md)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+    }
+
+    private var kcalRow: some View {
+        HStack(spacing: Theme.Spacing.lg) {
+            ConicRing(progress: entry.totals.kcal / max(dailyKcal, 1), lineWidth: 10) {
+                VStack(spacing: 0) {
+                    Text("\(Int(entry.totals.kcal.rounded()))").font(Theme.Typography.numeral(22))
                         .foregroundStyle(Theme.Palette.ink)
-                } else {
-                    Text("\(mealWord) logged · ~\(Int(entry.totals.kcal)) kcal")
-                        .font(Theme.Typography.body)
-                        .foregroundStyle(Theme.Palette.ink)
-                    Text(entry.balanceNote)
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(Theme.Palette.inkSecondary)
+                    Text("kcal").font(Theme.Typography.caption).foregroundStyle(Theme.Palette.inkSecondary)
                 }
             }
+            .frame(width: 96, height: 96)
 
+            VStack(spacing: Theme.Spacing.sm) {
+                macroRow("Carbs", entry.totals.carbs, Theme.Palette.bandOver)
+                macroRow("Protein", entry.totals.protein, Theme.Palette.sage)
+                macroRow("Fat", entry.totals.fat, Theme.Palette.accent)
+            }
+        }
+    }
+
+    private func macroRow(_ label: String, _ grams: Double, _ color: Color) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 9, height: 9)
+            Text(label).font(Theme.Typography.caption).foregroundStyle(Theme.Palette.ink)
             Spacer()
-
-            if let onRemove {
-                Button(role: .destructive, action: onRemove) {
-                    Image(systemName: "trash").font(Theme.Typography.caption)
-                }
-                .foregroundStyle(Theme.Palette.inkSecondary)
-                .accessibilityLabel("Remove this meal")
-            }
-
-            if let onEdit {
-                Button(action: onEdit) {
-                    Image(systemName: "pencil").font(Theme.Typography.caption)
-                }
-                .foregroundStyle(Theme.Palette.inkSecondary)
-                .accessibilityLabel("Edit this meal")
-            }
+            Text("\(Int(grams.rounded()))g").font(Theme.Typography.numeral(13)).foregroundStyle(Theme.Palette.ink)
         }
     }
 
-    @ViewBuilder private var thumbnail: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
-        if let image {
-            Image(uiImage: image).resizable().scaledToFill()
-                .frame(width: 44, height: 44)
-                .clipShape(shape)
-        } else {
-            MealPhoto(path: entry.photoPath, symbol: entry.photoSymbol ?? "fork.knife")
-                .frame(width: 44, height: 44)
-                .clipShape(shape)
+    private func energyCard(_ energy: EnergyShape) -> some View {
+        HStack(spacing: Theme.Spacing.md) {
+            EnergyRibbon(energy: energy).frame(width: 60, height: 24)
+            Text(energy.accentLine).accentLine().fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
+        .padding(Theme.Spacing.md)
+        .background(Theme.Palette.amberTintBg, in: RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous))
     }
 
-    private var mealWord: String {
-        switch Calendar.current.component(.hour, from: entry.capturedAt) {
-        case ..<11:   return "Breakfast"
-        case 11..<15: return "Lunch"
-        case 15..<18: return "Snack"
-        default:      return "Dinner"
-        }
-    }
-}
-
-/// Macro + focused-micronutrient breakdown for one logged meal — the app tracks far more than
-/// calories (memory: nutrition-app-direction). Calm + scannable: a macro row, then the seven
-/// micros in two columns. Protein is in the macro row; kcal is in the card header above.
-private struct MealNutrition: View {
-    let entry: Entry
-
-    private let columns = [GridItem(.flexible(), spacing: Theme.Spacing.md),
-                           GridItem(.flexible(), spacing: Theme.Spacing.md)]
-    private var micros: [Nutrient] { Nutrient.allCases.filter { $0 != .protein } }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            HStack(spacing: 0) {
-                macro("Protein", entry.totals.protein)
-                macro("Carbs", entry.totals.carbs)
-                macro("Fat", entry.totals.fat)
-            }
-            LazyVGrid(columns: columns, alignment: .leading, spacing: Theme.Spacing.sm) {
-                ForEach(micros) { n in
-                    HStack(spacing: 4) {
-                        Text(n.displayName)
-                            .font(.system(.caption2))
-                            .foregroundStyle(Theme.Palette.inkSecondary)
-                        Spacer(minLength: 4)
-                        Text("\(fmt(entry.micros[n])) \(n.unit)")
-                            .font(.system(.caption2).weight(.semibold))
-                            .foregroundStyle(Theme.Palette.ink)
+    private var bloomCard: some View {
+        WarmCard(padding: Theme.Spacing.md) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                SectionEyebrow(text: "Micronutrient bloom · share of today")
+                HStack(spacing: Theme.Spacing.md) {
+                    MicroBloom(petals: MicroBloom.petals(
+                        values: bloomMicros.map { entry.micros[$0] },
+                        references: bloomMicros.map { references[$0] }))
+                        .frame(width: 116, height: 116)
+                    VStack(spacing: 6) {
+                        ForEach(Array(bloomMicros.prefix(6).enumerated()), id: \.element) { i, n in
+                            HStack(spacing: 5) {
+                                Circle().fill(bloomColor(i)).frame(width: 8, height: 8)
+                                Text(ShareCard.shortName(n))
+                                    .font(Theme.Typography.caption).foregroundStyle(Theme.Palette.ink)
+                                Spacer(minLength: 2)
+                                Text("\(pct(n))%")
+                                    .font(Theme.Typography.numeral(11)).foregroundStyle(Theme.Palette.ink)
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private func macro(_ label: String, _ grams: Double) -> some View {
-        VStack(spacing: 2) {
-            Text("\(Int(grams.rounded())) g")
-                .font(Theme.Typography.body.weight(.semibold))
-                .foregroundStyle(Theme.Palette.ink)
-            Text(label)
-                .font(.system(.caption2))
-                .foregroundStyle(Theme.Palette.inkSecondary)
+    private var gapsNudge: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: "leaf.fill").foregroundStyle(Theme.Palette.sageText)
+            Text("A little low on \(lowMicros.map { $0.displayName }.joined(separator: " & ")) today")
+                .font(Theme.Typography.label).foregroundStyle(Theme.Palette.ink)
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
+        .padding(Theme.Spacing.md)
+        .background(Theme.Palette.sageTintBg, in: RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous))
     }
 
-    private func fmt(_ v: Double) -> String {
-        v < 10 ? String(format: "%.1f", v) : String(Int(v.rounded()))
+    private var actions: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Button(action: onEdit) { Text("Edit") }.buttonStyle(.secondary)
+            Button(role: .destructive, action: onDelete) {
+                Text("Delete").frame(maxWidth: .infinity).padding(.vertical, 16)
+                    .overlay(Capsule().strokeBorder(Theme.Palette.hairline, lineWidth: 1.5))
+            }
+            .font(Theme.Typography.label)
+            .foregroundStyle(Theme.Palette.inkSecondary)
+            .buttonStyle(.plain)
+        }
+        .padding(.top, Theme.Spacing.xs)
+    }
+
+    private var mealName: String {
+        let names = entry.items.map(\.name).filter { !$0.isEmpty }
+        if names.isEmpty { return entry.mealSlot?.label ?? "Your meal" }
+        if names.count <= 2 { return names.joined(separator: " & ") }
+        return "\(names[0]) & \(names.count - 1) more"
+    }
+
+    private func bloomColor(_ i: Int) -> Color {
+        [Theme.Palette.accent, Theme.Palette.sage, Theme.Palette.bandOver, Theme.Palette.honey][i % 4]
+    }
+
+    private func pct(_ n: Nutrient) -> Int {
+        let r = references[n]
+        return r > 0 ? Int((entry.micros[n] / r * 100).rounded()) : 0
+    }
+
+    private var lowMicros: [Nutrient] {
+        Nutrient.allCases
+            .map { ($0, references[$0] > 0 ? entry.micros[$0] / references[$0] : 1) }
+            .filter { $0.1 < 0.5 }
+            .sorted { $0.1 < $1.1 }
+            .prefix(2).map(\.0)
+    }
+}
+
+private struct RecentMealRow: View {
+    let entry: Entry
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            MealPhoto(path: entry.photoPath, symbol: entry.photoSymbol ?? "fork.knife")
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.tile, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                if entry.isLowConfidence {
+                    Text("Tap to confirm what this was").font(Theme.Typography.label).foregroundStyle(Theme.Palette.ink)
+                } else {
+                    Text(name).font(Theme.Typography.label).foregroundStyle(Theme.Palette.ink)
+                    HStack(spacing: 6) {
+                        if let energy = entry.energy {
+                            Circle().fill(energy.tint).frame(width: 8, height: 8)
+                        }
+                        Text("\(Int(entry.totals.kcal.rounded())) kcal\(entry.energy.map { " · \($0.label.lowercased())" } ?? "")")
+                            .font(Theme.Typography.caption).foregroundStyle(Theme.Palette.inkSecondary)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Theme.Spacing.sm)
+        .background(Theme.Palette.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous))
+    }
+
+    private var name: String {
+        let names = entry.items.map(\.name).filter { !$0.isEmpty }
+        return names.first ?? entry.mealSlot?.label ?? "Your meal"
     }
 }
 

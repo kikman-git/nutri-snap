@@ -22,6 +22,8 @@ final class CaptureViewModel {
     private(set) var message: String?
     /// The reviewer's optional note — extra context appended to the prompt. Bound by the review UI.
     var note: String = ""
+    /// The meal slot, defaulted from the capture hour and overridable by the review "When" chips (D3).
+    var selectedSlot: MealSlot = .default(for: Date())
     /// Raised when the server declines a scan on quota/entitlement grounds — the capture screen
     /// presents the gentle paywall. Two-way so the sheet's binding can clear it on dismiss.
     var showPaywall = false
@@ -51,6 +53,7 @@ final class CaptureViewModel {
         self.fromCamera = fromCamera
         imageData = image.jpegData(compressionQuality: 0.7)
         note = ""
+        selectedSlot = .default(for: Date())
         message = nil
         entry = nil
         phase = .reviewing
@@ -71,7 +74,7 @@ final class CaptureViewModel {
             let meal = try await estimator.estimate(imageData: imageData,
                                                     note: trimmed.isEmpty ? nil : trimmed)
             if meal.isFood {
-                let entry = meal.asEntry()
+                let entry = meal.asEntry(slot: selectedSlot)
                 self.entry = entry
                 phase = .logged
                 try? await store.save(entry, imageData: imageData)
