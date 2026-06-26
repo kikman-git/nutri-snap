@@ -208,9 +208,12 @@ These recur across many screens; build once:
 `BrandIcons.swift`); `EnergyShape.tint`/`labelColor` added to `Theme.swift`; the review step now
 overrides `MealSlot` via `asEntry(slot:)`; `MicroBloom` got a gentle √-curve so low shares still read.
 The `GALLERY=1` temp gallery + `_ComponentGallery.swift` are removed. Phase-2 viz (MicroBloom,
-ConicRing dials, area sparkline) folded in early since the components existed. Caveats: the Paywall
-plan cards need a live RevenueCat offering and the Reflect sheet needs an AI call, so both are
-code-complete but not screenshot-verified headlessly. Each is a styling pass once Phase 0 lands.
+ConicRing dials, area sparkline) folded in early since the components existed. The **Reflect sheet
+is now verified headlessly** (honey-gradient frame + prose) — `RootView` swaps in `MockReflector`
+under `USE_SAMPLE`/mock and the new `OPEN_REFLECT=1` hook auto-presents it. The only remaining
+unverified-headless surface is the **Paywall plan cards** (they iterate live RevenueCat `Package`s;
+the offering→package mapping is server-side, so a StoreKit config alone can't render them) — the
+emblem/value-prop/benefits + the gentle "couldn't load plans" fallback all verify fine.
 
 ### 1.1 `App/RootView.swift` — tab bar + FAB
 - FAB → gradient fill, amber-glow shadow, 4px surface ring, gentle `scale` breathe when idle on Snap.
@@ -286,7 +289,7 @@ These need **no** model/prompt/backend change — only the chosen nutrient label
   per-shortfall cards (today's adequacy vs `store.references`) each with 3 everyday-food tiles from a
   curated static table. **Reminder CTA dropped (D9).** **Plus-gated** — `RootView.requestGaps()` opens it
   (`fullScreenCover`) when subscribed, else the paywall; reached from the Today teaser + the Logged nudge
-  (now a tappable row). Hook: `OPEN_GAPS=1`.
+  (now a tappable row). Hook: `OPEN_GAPS=1`. (Trends Reflect hook: `OPEN_REFLECT=1` + `USE_SAMPLE=1`.)
 - **3.5 Structured Reflect** — kept as prose in the new frame (**D6** recommended default); structured
   highlights remain a later option.
 
