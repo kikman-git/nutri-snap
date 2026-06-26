@@ -4,211 +4,105 @@ export type PlanTier = 'free' | 'premiumMonthly' | 'premiumYearly' | 'power';
 
 export type ScanType = 'meal_photo' | 'nutrition_label' | 'packaged_food';
 
-export type ScanLifecycleState =
-  | 'created'
-  | 'reserved'
-  | 'upload_url_issued'
-  | 'uploaded'
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'refunded'
-  | 'expired'
-  | 'deleted';
-
-export type ScanOutcome = 'success' | 'failure';
-
-export interface PlanTiersConfig {
-  free: {
-    monthlyScans: number;
-    dailyScans: number;
-  };
-  premiumMonthly: {
-    monthlyScans: number;
-    dailyScans: number;
-  };
-  premiumYearly: {
-    monthlyScans: number;
-    dailyScans: number;
-  };
-  power: {
-    monthlyScans: number;
-    dailyScans: number;
-  };
-}
-
+/** Entitlement state at users/{uid}/plan/current — written ONLY by the RevenueCat webhook. */
 export interface PlanState {
   uid: string;
   tier: PlanTier;
   source: 'revenuecat' | 'bootstrap';
   hasActiveEntitlement: boolean;
   updatedAt: Timestamp;
-  graceUntil?: Timestamp;
 }
 
-export interface DailyQuotaWindow {
-  date: string;
+export interface MonthlyUsage {
   used: number;
   reserved: number;
-  failed: number;
 }
 
-export interface ScanQuotaSummary {
+/**
+ * Backend-owned usage ledger at users/{uid}/quota/summary. The client may READ it (rules) to
+ * show remaining scans, but never writes it — the whole trust boundary depends on that.
+ */
+export interface QuotaDoc {
   uid: string;
-  tier: PlanTier;
-  monthlyLimit: number;
-  monthlyUsed: number;
-  monthlyReserved: number;
-  dailyLimit: number;
-  dailyWindows: Record<string, DailyQuotaWindow>;
+  /** Free tier: a small lifetime allowance (the "taste"). */
+  lifetimeFreeUsed: number;
+  lifetimeFreeReserved: number;
+  /** Paid tiers: usage per calendar month (yyyy-MM), reset implicitly by keying on the month. */
+  months: Record<string, MonthlyUsage>;
   updatedAt: Timestamp;
-}
-
-export interface QuotaReserveResult {
-  canReserve: boolean;
-  reason?: QuotaRejectReason;
-  remainingMonthly: number;
-  remainingDaily: number;
 }
 
 export type QuotaRejectReason =
   | 'MISSING_ENTITLEMENT'
-  | 'OVER_DAILY_LIMIT'
-  | 'OVER_MONTHLY_LIMIT'
-  | 'PLAN_NOT_FOUND'
-  | 'SCAN_IN_PROGRESS';
+  | 'OVER_FREE_LIMIT'
+  | 'OVER_MONTHLY_LIMIT';
 
-export interface ScanLifecycleEvent {
-  state: ScanLifecycleState;
-  actor: 'backend' | 'scan_worker';
-  reason?: string;
-  createdAt: Timestamp;
-}
+export type ScanStatus = 'completed' | 'failed' | 'not_food';
 
-export interface ScanModelSelection {
-  provider: 'gemini' | 'claude' | 'other';
-  model: string;
-  routedBy: {
-    tier: PlanTier;
-    scanType: ScanType;
-  };
-  temperature?: number;
-  maxOutputTokens?: number;
-}
-
-export interface ScanResultPayload {
-  scanId: string;
+/** Minimal audit record at users/{uid}/scans/{scanId}; backend-owned (rules: client read-only). */
+export interface ScanRecord {
   uid: string;
+  scanId: string;
   scanType: ScanType;
-  status: ScanLifecycleState;
-  outcome: ScanOutcome;
-  title: string;
-  totalKcal?: number;
-  confidence: number;
-  notes?: string;
-  nutrients: Array<{
-    name: string;
-    quantity: number;
-    unit: string;
-    dailyTargetPercent?: number;
-  }>;
-  recipeSuggestions?: string[];
-  detectedFoods?: string[];
-  model: ScanModelSelection;
-  completedAt: Timestamp;
-}
-
-export interface R2ObjectMetadata {
-  scanId: string;
-  uid: string;
-  bucket: string;
-  key: string;
-  contentType: string;
-  sha256?: string;
-  sizeBytes: number;
-  retentionClass: 'retain' | 'delete_after_success';
+  tier: PlanTier;
+  status: ScanStatus;
+  model: string;
   createdAt: Timestamp;
-  updatedAt: Timestamp;
-  expiresAt?: Timestamp;
-  uploadedBy: 'app' | 'backend';
+  itemCount: number;
+  kcal: number;
+  confidence: number;
 }
 
-export type RevenueCatWebhookEventType =
+/**
+ * The wire contract Gemini returns (PRD §6) — mirrors the Swift `EstimatedMeal`. The backend
+ * validates this shape and passes it back to the client unchanged, so both share one decoder.
+ */
+export interface EstimatedMealWire {
+  items: Array<{
+    name: string;
+    portion: string;
+    kcal: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    confidence: number;
+  }>;
+  totals?: { kcal: number; protein: number; carbs: number; fat: number };
+  micros?: Record<string, number>;
+  balanceNote: string;
+  source: 'vision' | 'ocr';
+  notFood?: boolean;
+}
+
+// MARK: - RevenueCat webhook
+
+export type RevenueCatEventType =
   | 'INITIAL_PURCHASE'
   | 'RENEWAL'
   | 'CANCELLATION'
   | 'UNCANCELLATION'
   | 'EXPIRATION'
   | 'BILLING_ISSUE'
+  | 'PRODUCT_CHANGE'
+  | 'SUBSCRIPTION_PAUSED'
   | 'TEST'
   | 'UNKNOWN';
 
-export interface RevenueCatEnvironment {
+/** The real RevenueCat v1 webhook nests everything under `event`. */
+export interface RevenueCatEvent {
   id?: string;
-  project_id?: string;
-  app_id?: string;
-}
-
-export interface RevenueCatWebhookEvent {
-  id: string;
-  event_type: string;
-  event_ts?: number;
-  alias?: string;
-  event?: RevenueCatWebhookEventType;
-  event_name?: string;
-  app_id?: string;
-  webhook_id?: string;
-  api_version?: string;
-  environment?: RevenueCatEnvironment;
-  event_data?: RevenueCatEventData;
-  subscriber?: RevenueCatEventSubscriberDetails;
-  created_at?: number;
-}
-
-export interface RevenueCatEventData {
+  type?: string;
   app_user_id?: string;
   original_app_user_id?: string;
   product_id?: string;
-  base_plan_id?: string;
-  entitlement_id?: string;
   entitlement_ids?: string[];
   period_type?: string;
+  expiration_at_ms?: number;
   purchased_at_ms?: number;
   grace_period_expires_at_ms?: number;
 }
 
-export interface RevenueCatEventSubscriberDetails {
-  app_user_id?: string;
-  original_app_user_id?: string;
-  first_seen?: number;
-  custom_data?: Record<string, unknown>;
-  non_subscriptions?: unknown[];
-  presented_offerings?: unknown[];
-  subscriptions?: Record<string, unknown>;
-  entitlements?: Record<string, unknown>;
-}
-
-export interface ScanReservation {
-  uid: string;
-  scanId: string;
-  scanType: ScanType;
-  planTierAtReserve: PlanTier;
-  quotaReservedAt: Timestamp;
-  quotaReservedBy: 'backend';
-  status: ScanLifecycleState;
-  lifecycle: ScanLifecycleEvent[];
-  r2: R2ObjectMetadata;
-  model?: ScanModelSelection;
-  result?: ScanResultPayload;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-  finalizedAt?: Timestamp;
-  refundedAt?: Timestamp | string;
-  lastHeartbeat?: Timestamp;
-  quota?: {
-    monthKey: string;
-    note: string;
-    summary: ScanQuotaSummary;
-    model: ScanModelSelection;
-  };
+export interface RevenueCatWebhookBody {
+  api_version?: string;
+  event?: RevenueCatEvent;
 }
