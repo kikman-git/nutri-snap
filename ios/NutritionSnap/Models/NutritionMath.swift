@@ -24,10 +24,11 @@ enum NutritionMath {
                          fat:     (kcal * 0.30 / 9).rounded())
     }
 
-    /// Daily reference intakes for the focused 8 (MHLW 2020 DRIs, adult). Sex is the main driver —
-    /// iron, zinc, vitamin A and magnesium differ — so women aren't judged against male numbers.
-    /// Protein follows the user's macro target so the app shows one protein figure everywhere.
-    /// Age-banding is a later refinement. Returned as `NutrientAmounts` so it threads next to totals.
+    /// Daily reference intakes for the focused 12 (MHLW 2020 DRIs, adult). Sex is the main driver —
+    /// iron, zinc, vitamin A, magnesium and potassium differ — so women aren't judged against male
+    /// numbers. Protein follows the user's macro target so the app shows one protein figure
+    /// everywhere. Age-banding is a later refinement. Returned as `NutrientAmounts` so it threads
+    /// next to totals. (Warm Bloom D2 added potassium, vitamin D, B12, folate — see NUTRITION_EVIDENCE §3.)
     static func microReferences(sex: BiologicalSex, proteinTarget: Double) -> NutrientAmounts {
         let male = sex == .male
         return NutrientAmounts([
@@ -39,6 +40,10 @@ enum NutritionMath {
             .zinc:      male ? 11  : 8,
             .iron:      male ? 7.5 : 10.5,   // menstruating women need more
             .magnesium: male ? 370 : 290,
+            .potassium: male ? 2500 : 2000,  // MHLW adequate intake (AI)
+            .vitaminD:  8.5,                  // AI, both sexes
+            .b12:       2.4,                  // RDA, both sexes
+            .folate:    240,                  // RDA, both sexes (µg)
         ])
     }
 }

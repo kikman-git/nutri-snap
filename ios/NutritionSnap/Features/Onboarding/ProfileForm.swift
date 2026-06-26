@@ -129,35 +129,29 @@ struct TargetPreviewCard: View {
     let target: Nutrients
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.xs) {
-            Text("Your gentle daily target")
-                .font(.system(.caption)).foregroundStyle(Theme.Palette.surface.opacity(0.85))
-            HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.xs) {
-                Text("\(Int(target.kcal))")
-                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                Text("kcal").font(Theme.Typography.body)
+        WarmCard(honey: true) {
+            VStack(spacing: Theme.Spacing.xs) {
+                Text("Your gentle daily target").overline()
+                HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.xs) {
+                    Text("\(Int(target.kcal))").font(Theme.Typography.numeral(40))
+                    Text("kcal").font(Theme.Typography.body).foregroundStyle(Theme.Palette.inkSecondary)
+                }
+                .foregroundStyle(Theme.Palette.ink)
+                HStack(spacing: Theme.Spacing.xl) {
+                    macro("Protein", target.protein)
+                    macro("Carbs", target.carbs)
+                    macro("Fat", target.fat)
+                }
+                .padding(.top, Theme.Spacing.xs)
             }
-            .foregroundStyle(Theme.Palette.surface)
-
-            HStack(spacing: Theme.Spacing.xl) {
-                macro("Protein", target.protein)
-                macro("Carbs", target.carbs)
-                macro("Fat", target.fat)
-            }
-            .padding(.top, Theme.Spacing.xs)
+            .frame(maxWidth: .infinity)
         }
-        .padding(Theme.Spacing.lg)
-        .frame(maxWidth: .infinity)
-        .background(Theme.Palette.accent,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
     }
 
     private func macro(_ label: String, _ grams: Double) -> some View {
         VStack(spacing: 2) {
-            Text("\(Int(grams))g")
-                .font(Theme.Typography.body.weight(.semibold)).foregroundStyle(Theme.Palette.surface)
-            Text(label)
-                .font(.system(.caption2)).foregroundStyle(Theme.Palette.surface.opacity(0.85))
+            Text("\(Int(grams))g").font(Theme.Typography.numeral(15)).foregroundStyle(Theme.Palette.ink)
+            Text(label).font(Theme.Typography.caption).foregroundStyle(Theme.Palette.inkSecondary)
         }
     }
 }

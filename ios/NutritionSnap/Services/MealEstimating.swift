@@ -36,7 +36,9 @@ enum EstimationError: LocalizedError {
 /// ```
 /// items:       [ { name, portion, kcal, protein, carbs, fat, confidence } ]
 /// totals:      { kcal, protein, carbs, fat }
-/// micros:      { fiber, omega3, vitaminC, vitaminA, zinc, iron, magnesium }   ← whole-meal estimate
+/// micros:      { fiber, omega3, vitaminC, vitaminA, zinc, iron, magnesium,
+///                potassium, vitaminD, b12, folate }                          ← whole-meal estimate
+/// energy:      "steady" | "gentleRise" | "spike"   ← wordless energy read (D1)
 /// balanceNote: string
 /// source:      "vision" | "ocr"
 /// notFood:     bool?      ← gentle off-ramp when the photo isn't a meal
@@ -44,9 +46,12 @@ enum EstimationError: LocalizedError {
 struct EstimatedMeal: Codable, Hashable {
     var items: [EstimatedItem]
     var totals: Nutrients?
-    /// The seven non-protein focused nutrients for the whole meal (PRD §4 evolved). Rough by
+    /// The eleven non-protein focused nutrients for the whole meal (PRD §4 evolved). Rough by
     /// nature; protein is in `totals`. Absent → treated as zero.
     var micros: NutrientAmounts?
+    /// The model's wordless energy read for the whole meal (D1) — see `EnergyShape`. Absent on
+    /// older payloads / not-food → nil (the surface simply omits the ribbon).
+    var energy: EnergyShape?
     var balanceNote: String
     var source: NutritionSource
     var notFood: Bool?
@@ -64,7 +69,8 @@ struct EstimatedMeal: Codable, Hashable {
 
     /// The real captured photo is carried alongside the `Entry` (Models stay UIKit-free),
     /// so `photoSymbol` is left nil here — the camera path supplies the actual image.
-    func asEntry(capturedAt: Date = Date()) -> Entry {
+    /// `slot` lets the review step's "When" chips override the hour-derived default (D3).
+    func asEntry(capturedAt: Date = Date(), slot: MealSlot? = nil) -> Entry {
         Entry(capturedAt: capturedAt,
               source: source,
               edited: false,
@@ -72,7 +78,9 @@ struct EstimatedMeal: Codable, Hashable {
               totals: resolvedTotals,
               micros: micros ?? .zero,
               balanceNote: balanceNote,
-              photoSymbol: nil)
+              photoSymbol: nil,
+              energy: energy,
+              mealSlot: slot ?? MealSlot.default(for: capturedAt))
     }
 }
 
@@ -113,7 +121,15 @@ enum GeminiPrompt {
 
     Also estimate, for the whole meal, these micronutrients from typical food composition — \
     rough is expected, they're inherently uncertain: fiber (g), omega-3 (g), vitamin C (mg), \
-    vitamin A (µgRAE), zinc (mg), iron (mg), magnesium (mg).
+    vitamin A (µgRAE), zinc (mg), iron (mg), magnesium (mg), potassium (mg), vitamin D (µg), \
+    vitamin B12 (µg), folate (µg).
+
+    Also give a gentle "energy read" for the whole meal — how it's likely to make someone feel \
+    over the next couple of hours — as a population-level qualitative cue, never a glucose number \
+    and never a personal prediction. Weigh the levers: protein, fat and viscous fiber steady it; \
+    a large portion of refined or quick carbohydrate (white rice, bread, sugar, juice) pushes it \
+    toward a quicker rise. Choose exactly one: "steady" (slow, even energy), "gentleRise" (a \
+    moderate, even lift), or "spike" (a quicker rise-and-dip). Stay kind — never call a food bad.
 
     If the photo is clearly not a meal, set "notFood": true with an empty items array and \
     a kind one-line balanceNote.
@@ -129,13 +145,16 @@ enum GeminiPrompt {
       ],
       "totals": { "kcal": number, "protein": number, "carbs": number, "fat": number },
       "micros": { "fiber": number, "omega3": number, "vitaminC": number,
-                  "vitaminA": number, "zinc": number, "iron": number, "magnesium": number },
+                  "vitaminA": number, "zinc": number, "iron": number, "magnesium": number,
+                  "potassium": number, "vitaminD": number, "b12": number, "folate": number },
+      "energy": "steady" | "gentleRise" | "spike",
       "balanceNote": string,
       "source": "vision" | "ocr",
       "notFood": boolean
     }
     Macros are grams. Totals are the sum across items. Micros are for the whole meal: \
-    fiber and omega-3 in grams, vitamin A in µg, the rest in mg.
+    fiber and omega-3 in grams; vitamin A, vitamin D, B12 and folate in µg; vitamin C, zinc, \
+    iron, magnesium and potassium in mg.
     """
 
     /// Wraps the reviewer's optional note as *extra context*. Deliberately framed as data,

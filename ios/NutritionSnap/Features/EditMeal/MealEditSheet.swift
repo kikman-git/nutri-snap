@@ -125,7 +125,7 @@ struct MealEditSheet: View {
             TextField("0", text: value)
                 .keyboardType(.decimalPad)
                 .padding(Theme.Spacing.sm)
-                .background(Theme.Palette.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+                .background(Theme.Palette.background, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
         }
     }
 
@@ -150,7 +150,7 @@ struct MealEditSheet: View {
                             .multilineTextAlignment(.trailing)
                             .padding(Theme.Spacing.sm)
                             .frame(width: 100)
-                            .background(Theme.Palette.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+                            .background(Theme.Palette.background, in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
                     }
                 }
             }

@@ -41,13 +41,15 @@ struct Nutrients: Codable, Hashable {
     }
 }
 
-/// The "focused 8" nutrients the app tracks for long-term health/beauty (see memory:
+/// The "focused 12" nutrients the app tracks for long-term health/beauty (see memory:
 /// nutrition-app-direction). Estimated from photos — low-confidence by nature, judged on
 /// rolling adequacy over time, never daily pass/fail. Protein lives in `Nutrients`; the other
-/// seven ride along in `NutrientAmounts`. Reference intakes are MHLW DRIs, personalized by sex from
-/// the profile at onboarding (`MealStore.references` / `NutritionMath.microReferences`).
+/// eleven ride along in `NutrientAmounts`. Reference intakes are MHLW DRIs, personalized by sex
+/// from the profile at onboarding (`MealStore.references` / `NutritionMath.microReferences`).
+/// (Warm Bloom D2 grew the set 8 → 12: added potassium, vitamin D, B12, folate.)
 enum Nutrient: String, CaseIterable, Identifiable, Codable {
     case protein, fiber, omega3, vitaminC, vitaminA, zinc, iron, magnesium
+    case potassium, vitaminD, b12, folate
 
     var id: String { rawValue }
 
@@ -61,14 +63,72 @@ enum Nutrient: String, CaseIterable, Identifiable, Codable {
         case .zinc:      return "Zinc"
         case .iron:      return "Iron"
         case .magnesium: return "Magnesium"
+        case .potassium: return "Potassium"
+        case .vitaminD:  return "Vitamin D"
+        case .b12:       return "Vitamin B12"
+        case .folate:    return "Folate"
         }
     }
 
     var unit: String {
         switch self {
-        case .protein, .fiber, .omega3:            return "g"
-        case .vitaminC, .zinc, .iron, .magnesium:  return "mg"
-        case .vitaminA:                            return "µg"
+        case .protein, .fiber, .omega3:                        return "g"
+        case .vitaminC, .zinc, .iron, .magnesium, .potassium:  return "mg"
+        case .vitaminA, .vitaminD, .b12, .folate:              return "µg"
+        }
+    }
+}
+
+/// The wordless "energy read" for a meal (Warm Bloom D1) — how it's likely to make you feel over the
+/// next couple of hours: slow-and-steady vs a quicker rise-and-dip. A **population-level qualitative**
+/// cue from the glucose-impact levers (protein/fat/viscous fiber steady it; a big portion of refined
+/// carbohydrate pushes it up) — never a glucose number, never *your* personal curve
+/// (`docs/NUTRITION_EVIDENCE.md` §4). Model-estimated per meal; absent on older/not-food entries.
+enum EnergyShape: String, Codable, CaseIterable, Identifiable {
+    case steady, gentleRise, spike
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .steady:     return "Steady"
+        case .gentleRise: return "Gentle rise"
+        case .spike:      return "Quick rise"
+        }
+    }
+
+    /// One calm Newsreader-italic accent line for the logged card / timeline. Gentle, never alarmist;
+    /// the "quick rise" line leads with the food-order lever (the strongest, kindest nudge — §4.2).
+    var accentLine: String {
+        switch self {
+        case .steady:     return "slow, steady energy"
+        case .gentleRise: return "a gentle, even lift"
+        case .spike:      return "a quicker rise — a few bites of veg or protein first steadies it"
+        }
+    }
+}
+
+/// When a meal happened (Warm Bloom D3) — optional, defaults from the capture hour so Trends/Journal
+/// can group by part of day without the user setting anything. The review step may override it.
+enum MealSlot: String, Codable, CaseIterable, Identifiable {
+    case breakfast, lunch, dinner, snack
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .breakfast: return "Breakfast"
+        case .lunch:     return "Lunch"
+        case .dinner:    return "Dinner"
+        case .snack:     return "Snack"
+        }
+    }
+
+    /// Default slot from the hour of day — mirrors `CaptureScreen.mealWord` (<11 / 11–15 / 15–18 / else).
+    static func `default`(for date: Date, calendar: Calendar = .current) -> MealSlot {
+        switch calendar.component(.hour, from: date) {
+        case ..<11:   return .breakfast
+        case 11..<15: return .lunch
+        case 15..<18: return .snack
+        default:      return .dinner
         }
     }
 }
@@ -133,7 +193,7 @@ struct Entry: Identifiable, Codable, Hashable {
     var edited: Bool
     var items: [FoodItem]
     var totals: Nutrients
-    /// The other seven focused nutrients for this entry (protein is in `totals`).
+    /// The other eleven focused nutrients for this entry (protein is in `totals`).
     var micros: NutrientAmounts = .zero
     var balanceNote: String
     /// MVP placeholder: an SF Symbol name standing in for the real food photo.
@@ -141,6 +201,11 @@ struct Entry: Identifiable, Codable, Hashable {
     /// Local filename of the saved photo (under Application Support; free tier — Cloud Storage is
     /// M4). Set on save when the write succeeds; nil falls back to a placeholder.
     var photoPath: String? = nil
+    /// The model's wordless energy read for this meal (D1). Optional — older docs + not-food lack it.
+    var energy: EnergyShape? = nil
+    /// Part of day this meal belongs to (D3), defaulted from the capture hour at log time. Optional
+    /// for back-compat; a missing key decodes to nil (synthesized `Codable` on an optional).
+    var mealSlot: MealSlot? = nil
 
     /// Low-confidence results invite a tap instead of asserting (PRD §5.2).
     var isLowConfidence: Bool {

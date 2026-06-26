@@ -47,10 +47,10 @@ struct ShareCard: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 1) {
             Text(value)
-                .font(.system(.headline, design: .rounded).weight(.semibold))
+                .font(.custom("HankenGrotesk-ExtraBold", size: 17).monospacedDigit())
                 .foregroundStyle(Theme.Palette.ink)
             Text(label)
-                .font(.system(size: 9))
+                .font(.custom("HankenGrotesk-Medium", size: 9))
                 .foregroundStyle(Theme.Palette.inkSecondary)
         }
         .frame(maxWidth: .infinity)
@@ -71,15 +71,15 @@ struct ShareCard: View {
     private var footer: some View {
         HStack(spacing: 4) {
             Image(systemName: "leaf.fill").font(.system(size: 9))
-            Text("Nutri Snap").font(.system(size: 10, weight: .medium))
+            Text("Nutri Snap").font(.custom("HankenGrotesk-SemiBold", size: 10))
             Spacer()
-            Text(Self.dateString(date)).font(.system(size: 10))
+            Text(Self.dateString(date)).font(.custom("HankenGrotesk-Medium", size: 10))
         }
         .foregroundStyle(Theme.Palette.inkSecondary)
         .padding(.top, 2)
     }
 
-    /// Compact labels so all seven fit in one row (full names live in-app).
+    /// Compact labels for the micro row (full names live in-app).
     static func shortName(_ n: Nutrient) -> String {
         switch n {
         case .fiber:     return "Fiber"
@@ -90,6 +90,10 @@ struct ShareCard: View {
         case .iron:      return "Iron"
         case .magnesium: return "Mag"
         case .protein:   return "Protein"
+        case .potassium: return "K"
+        case .vitaminD:  return "Vit D"
+        case .b12:       return "B12"
+        case .folate:    return "Folate"
         }
     }
 
@@ -150,7 +154,7 @@ private struct PhotoCollage: View {
                     ZStack {
                         Color.black.opacity(0.35)
                         Text("+\(overflow)")
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.custom("HankenGrotesk-Bold", size: 22))
                             .foregroundStyle(.white)
                     }
                 }
@@ -177,14 +181,14 @@ private struct NutrientRing: View {
                     .stroke(Theme.Palette.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Text(amount)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.custom("HankenGrotesk-ExtraBold", size: 9).monospacedDigit())
                     .foregroundStyle(Theme.Palette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
             .frame(width: 34, height: 34)
             Text(name)
-                .font(.system(size: 8))
+                .font(.custom("HankenGrotesk-Medium", size: 8))
                 .foregroundStyle(Theme.Palette.inkSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

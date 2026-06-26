@@ -82,35 +82,44 @@ enum SampleData {
               split: (0.20, 0.45, 0.35), note: "A balanced start.",
               symbol: "fork.knife", confidence: 0.82,
               micros: [.fiber: 4, .omega3: 0.1, .vitaminC: 10, .vitaminA: 250,
-                       .zinc: 2.5, .iron: 2.5, .magnesium: 95])
+                       .zinc: 2.5, .iron: 2.5, .magnesium: 95,
+                       .potassium: 260, .vitaminD: 1.0, .b12: 0.8, .folate: 45],
+              energy: .gentleRise, slot: .breakfast)
     }
     private static func lunch(_ kcal: Double) -> Entry {
         entry(name: "親子丼 / Oyakodon", portion: "1 bowl", kcal: kcal,
               split: (0.22, 0.55, 0.23), note: "Looks balanced.",
               symbol: "takeoutbag.and.cup.and.straw.fill", confidence: 0.55, // low → invites a tap
               micros: [.fiber: 5, .omega3: 0.2, .vitaminC: 40, .vitaminA: 180,
-                       .zinc: 3.5, .iron: 3.0, .magnesium: 110])
+                       .zinc: 3.5, .iron: 3.0, .magnesium: 110,
+                       .potassium: 360, .vitaminD: 0.9, .b12: 0.9, .folate: 55],
+              energy: .spike, slot: .lunch)   // big white-rice portion → quicker rise
     }
     private static func dinner(_ kcal: Double) -> Entry {
         entry(name: "Salmon & rice", portion: "1 plate", kcal: kcal,
               split: (0.28, 0.42, 0.30), note: "Good protein tonight.",
               symbol: "fish.fill", confidence: 0.78,
               micros: [.fiber: 5, .omega3: 1.1, .vitaminC: 35, .vitaminA: 140,
-                       .zinc: 3.5, .iron: 2.0, .magnesium: 120])
+                       .zinc: 3.5, .iron: 2.0, .magnesium: 120,
+                       .potassium: 520, .vitaminD: 8.0, .b12: 3.0, .folate: 30],
+              energy: .gentleRise, slot: .dinner)   // fatty fish blunts the rice
     }
     private static func snack(_ kcal: Double) -> Entry {
         entry(name: "Yogurt & fruit", portion: "1 cup", kcal: kcal,
               split: (0.18, 0.62, 0.20), note: "A light bite.",
               symbol: "cup.and.saucer.fill", confidence: 0.70,
               micros: [.fiber: 3, .omega3: 0.0, .vitaminC: 35, .vitaminA: 90,
-                       .zinc: 1.5, .iron: 0.5, .magnesium: 45])
+                       .zinc: 1.5, .iron: 0.5, .magnesium: 45,
+                       .potassium: 300, .vitaminD: 0.1, .b12: 0.5, .folate: 20],
+              energy: .steady, slot: .snack)
     }
 
     /// `split` = (protein, carbs, fat) fraction of kcal; grams via 4/4/9 kcal-per-gram.
     private static func entry(name: String, portion: String, kcal: Double,
                               split: (Double, Double, Double), note: String,
                               symbol: String, confidence: Double,
-                              micros: [Nutrient: Double]) -> Entry {
+                              micros: [Nutrient: Double],
+                              energy: EnergyShape, slot: MealSlot) -> Entry {
         let nutrients = Nutrients(kcal: kcal,
                                   protein: kcal * split.0 / 4,
                                   carbs:   kcal * split.1 / 4,
@@ -120,6 +129,6 @@ enum SampleData {
                             fat: nutrients.fat, confidence: confidence)
         return Entry(capturedAt: Date(), source: .vision, edited: false,
                      items: [item], totals: nutrients, micros: NutrientAmounts(micros),
-                     balanceNote: note, photoSymbol: symbol)
+                     balanceNote: note, photoSymbol: symbol, energy: energy, mealSlot: slot)
     }
 }

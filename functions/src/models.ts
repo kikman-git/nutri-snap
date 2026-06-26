@@ -57,6 +57,8 @@ export interface ScanRecord {
  * The wire contract Gemini returns (PRD §6) — mirrors the Swift `EstimatedMeal`. The backend
  * validates this shape and passes it back to the client unchanged, so both share one decoder.
  */
+export type EnergyShape = 'steady' | 'gentleRise' | 'spike';
+
 export interface EstimatedMealWire {
   items: Array<{
     name: string;
@@ -68,7 +70,11 @@ export interface EstimatedMealWire {
     confidence: number;
   }>;
   totals?: { kcal: number; protein: number; carbs: number; fat: number };
+  // Whole-meal micro estimates, keyed by name (focused-12): fiber, omega3, vitaminC, vitaminA,
+  // zinc, iron, magnesium, potassium, vitaminD, b12, folate. A bag, so new keys need no type change.
   micros?: Record<string, number>;
+  // Wordless energy read (D1). Validated/normalized server-side to one of the three or dropped.
+  energy?: EnergyShape;
   balanceNote: string;
   source: 'vision' | 'ocr';
   notFood?: boolean;

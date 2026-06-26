@@ -66,27 +66,46 @@ https://www.ncbi.nlm.nih.gov/books/NBK610333/
 
 ---
 
-## 3. Micronutrient references — the focused 8  **[AUTHORITATIVE STANDARD]**
+## 3. Micronutrient references — the focused 12  **[AUTHORITATIVE STANDARD]**
 
 **Claim:** daily reference intakes for protein, fiber, omega-3, vitamin C, vitamin A, zinc, iron,
-magnesium, personalized by sex.
+magnesium, **potassium, vitamin D, vitamin B12, folate**, personalized by sex.
 **Where in code:** `NutritionMath.microReferences` (values live there).
 
 Basis: **MHLW — Dietary Reference Intakes for Japanese (2020)**, the Japanese national standard
 (locale-fit, since the app is Japan-first). Sex is the main driver (iron, zinc, vitamin A,
-magnesium differ); age-banding is a later refinement. Judged on **rolling-average adequacy vs
-reference, never daily pass/fail** (a hard product constraint).
+magnesium and potassium differ); age-banding is a later refinement. Judged on **rolling-average
+adequacy vs reference, never daily pass/fail** (a hard product constraint).
+
+**Warm Bloom D2 expanded the set 8 → 12.** Honest grading of the four additions — MHLW sets two of
+them as a firmer **RDA (推奨量)** and two as a softer **Adequate Intake (目安量, AI)**, which we
+surface as a "reference," not a verdict:
+
+| Nutrient | MHLW figure (adult) | Type | Note |
+|---|---|---|---|
+| Potassium | 2500 mg ♂ / 2000 mg ♀ | **AI** (目安量) | A separate, higher "target for prevention" (~3000/2600) exists; we use the AI as the gentler reference. |
+| Vitamin D | 8.5 µg (both sexes) | **AI** (目安量) | Commonly runs low; sunlight contributes, so a photo under-reads true status — frame softly. |
+| Vitamin B12 | 2.4 µg (both sexes) | **RDA** (推奨量) | Animal-source; relevant to vegetarian/vegan patterns. |
+| Folate | 240 µg (both sexes) | **RDA** (推奨量) | Higher needs in pregnancy are out of v1 scope. |
 
 > Note: the per-value table is maintained in code, not re-derived here. If the MHLW DRIs are
-> revised, update `NutritionMath.microReferences` and note it here.
+> revised, update `NutritionMath.microReferences` and note it here. The `NutrientGuide` in-app
+> reference list mirrors these figures.
 
 ---
 
-## 4. Glucose-impact signal (the qualitative GI read)
+## 4. Glucose-impact signal — the in-app "Energy Read" (qualitative GI read)
 
-The new feature: a per-meal **gentle / moderate / quick-rise** classification — *not* a GI number,
+The feature: a per-meal **gentle / moderate / quick-rise** classification — *not* a GI number,
 *not* a personal prediction. This section is the evidence that shapes both the prompt rubric and
 the design decision to stay qualitative.
+
+**Where in code (Warm Bloom D1):** surfaced as `EnergyShape { steady, gentleRise, spike }` =
+the gentle / moderate / quick-rise read. It is **model-estimated per meal** (not derived on-device)
+and carried through the §6 contract — `EstimatedMeal.energy` (`Services/MealEstimating.swift`) ↔
+`EstimatedMealWire.energy` (`functions/src/models.ts`), requested in the scan prompt and
+**normalized server-side** to the three allowed values (`functions/src/index.ts`). The prompt
+instructs the model to weigh the §4.2 levers below; the output is a wordless cue, never a number.
 
 ### 4.1 Why it matters long-term  **[STRONG]**
 

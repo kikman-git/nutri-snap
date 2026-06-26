@@ -5,21 +5,31 @@ import SwiftUI
 /// default (gentle, low-friction — it's editable later in Settings). Presented by `RootView`
 /// while `store.needsOnboarding`.
 struct OnboardingView: View {
+    enum Step { case welcome, profile }
+
     @Environment(MealStore.self) private var store
+    @State private var step: Step = .welcome
     @State private var inputs = ProfileInputs()
     @State private var saving = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                header
-                ProfileFieldsView(inputs: $inputs)
-                TargetPreviewCard(target: inputs.target)
-                buttons
+        Group {
+            switch step {
+            case .welcome:
+                WelcomeView { withAnimation(.easeInOut) { step = .profile } }
+            case .profile:
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        header
+                        ProfileFieldsView(inputs: $inputs)
+                        TargetPreviewCard(target: inputs.target)
+                        buttons
+                    }
+                    .padding(Theme.Spacing.lg)
+                }
+                .background(Theme.Palette.background.ignoresSafeArea())
             }
-            .padding(Theme.Spacing.lg)
         }
-        .background(Theme.Palette.background.ignoresSafeArea())
         .onAppear { if let p = store.profile { inputs = ProfileInputs(p) } }
     }
 
@@ -36,20 +46,11 @@ struct OnboardingView: View {
 
     private var buttons: some View {
         VStack(spacing: Theme.Spacing.md) {
-            Button(action: useTarget) {
-                Text("Use this target")
-                    .font(Theme.Typography.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Theme.Palette.accent,
-                                in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
-                    .foregroundStyle(Theme.Palette.surface)
-            }
-            .disabled(saving)
-
+            Button("Use this target", action: useTarget)
+                .buttonStyle(.primary)
+                .disabled(saving)
             Button("Skip for now") { saving = true; Task { await store.skipOnboarding() } }
-                .font(Theme.Typography.body)
-                .foregroundStyle(Theme.Palette.inkSecondary)
+                .buttonStyle(.ghost(muted: true))
                 .disabled(saving)
         }
         .padding(.top, Theme.Spacing.sm)
