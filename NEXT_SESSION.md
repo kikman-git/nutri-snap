@@ -6,17 +6,30 @@ The running state + what to do next. `PRD.md` = product truth · `CLAUDE.md` = h
 > (`ios/project.yml`, `ios/NutritionSnap/…`); `functions/`, Firebase config, `design/`,
 > `test-assets/`, and docs stay at root; `android/` is a placeholder (PRD: Android is v2+).
 
-## Where we are (2026-06-24)
+## Where we are (2026-06-26)
 
-Milestones **1–5 + 4A done**; app builds + runs on the iPhone 16 Plus sim (iOS 18.6). See CLAUDE.md for the per-milestone detail.
+Milestones **1–5 + 4A done**, and **M6 (server-enforced paywall) is code-complete** — backend + client both built and verified; what's left is operational deploy + a live purchase test. App builds + runs on the iPhone 16 Plus sim (iOS 18.6). See CLAUDE.md for the per-milestone detail.
 
-- **M5 just landed — onboarding + personalized targets.** First-run gate collects body stats → **Mifflin–St Jeor** daily target (`Models/NutritionMath.swift`); micro references **personalized by sex**; edit later via the person icon in the Trends header. Verified on sim (math correct; fixed a segmented-`Picker` binding bug). Hook: `FORCE_ONBOARDING=1` + `USE_SAMPLE=1`.
-- **Repo is public / open-source.** Secret audit done: **no API keys or credentials in any tracked file or in git history.** `GoogleService-Info.plist` is gitignored + was never committed; Cloud Functions read every secret from `process.env` (nothing hardcoded). App Check **debug tokens** were scrubbed from the docs — if any were ever live, delete them in Firebase console (App Check → Manage debug tokens). Personal email scrubbed from this doc.
-- **Direction (2026-06-26) — next build is M6: a server-enforced paywall, *no login* (grill-resolved).** Branch `m6-paywall`. The Apple Developer Program is now **paid** ✅. See the Active section below.
+- **M6 just landed — server-enforced paywall, no login (the whole thing is built).** `scanMeal` Cloud Function is the only path to Gemini (Auth + App Check + quota); RevenueCat drives a custom SwiftUI paywall (client = UX only, server = enforcer). **Open PR: [#2](https://github.com/kikman-git/nutri-snap/pull/2)** (`m6-paywall` → `master`, 5 commits). iOS BUILD SUCCEEDED, backend tsc clean, paywall verified live against the RevenueCat Test Store on the sim. **Next session = operational only** (see ⬇️ "Next session — start here"). Two new skills: `revenuecat-ios`, `nutrisnap-ios`.
+- **M5 — onboarding + personalized targets.** First-run gate collects body stats → **Mifflin–St Jeor** daily target (`Models/NutritionMath.swift`); micro references **personalized by sex**; edit later via the person icon in the Trends header. Verified on sim. Hook: `FORCE_ONBOARDING=1` + `USE_SAMPLE=1`.
+- **Repo is public / open-source.** Secret audit done: **no API keys or credentials in any tracked file or in git history.** `GoogleService-Info.plist` is gitignored + was never committed; Cloud Functions read every secret from `process.env`; the RevenueCat key is read from `REVENUECAT_API_KEY` (never committed). App Check **debug tokens** were scrubbed from the docs.
 
-## Active: M6 — server-enforced paywall (no login) · branch `m6-paywall`
+## Next session — start here
 
-Decided via design grill (2026-06-26). The "add login" task was reframed: login isn't needed
+**All M6 code is done.** The remaining work is operational setup + live verification, then the App Store track. In order:
+
+1. **Deploy the backend** — `M6_SETUP.md` Part A (Blaze → `GEMINI_API_KEY` + webhook secret → `firebase deploy` → register the App Check token). ⚠️ Until this is live the app can't scan (the client calls the backend now). Dev shortcut: `ONDEVICE_GEMINI=1`.
+2. **RevenueCat + ASC** — `M6_SETUP.md` Part B (subscriptions + 7-day trials, entitlement `premium`, offering `default`, webhook → the deployed URL with the shared secret).
+3. **Set `REVENUECAT_API_KEY`** on the run scheme; **live-verify on a device** w/ a sandbox tester: 3 free scans → paywall → trial purchase → webhook flips `plan/current` → paid scans work. (Allow a few seconds for the webhook; the app shows "activating… tap Analyze again" by design — don't expect instant.)
+4. **Pre-submit code follow-ups** (small, gated on shipping): swap the `test_` RevenueCat key for the `appl_` key and **bake it into a git-ignored `Secrets.swift`** (scheme env vars don't reach archived builds — see the `revenuecat-ios` skill); replace the placeholder **privacy-policy URL** in `PaywallView` (`TODO(launch)`).
+5. Then the **device + App Store track** below.
+
+Merge PR #2 once the live purchase test passes (or merge now and treat ops as follow-up — your call).
+
+## M6 reference — server-enforced paywall (no login) · branch `m6-paywall` · ✅ built
+
+The locked decisions + what each commit did. (The active to-do is the "start here" list above;
+this is the design record.) Decided via design grill (2026-06-26). The "add login" task was reframed: login isn't needed
 to take money (StoreKit bills the Apple ID; RevenueCat tracks entitlement against
 `appUserID = Firebase anon uid`). So **login is deferred** and the goal — cover infra cost —
 is met by a **paywall with a full backend trust boundary**.
