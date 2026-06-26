@@ -1,11 +1,47 @@
 rules_version = '2';
 
-// Each user can read/write only their own subtree (entries, day rollups, profile).
-// Anonymous auth still yields a stable uid, so this holds before Sign in with Apple (M4).
+// Per-user subtree. The split matters: the client owns its meal data, but plan/quota/scans are
+// BACKEND-owned (written only by Cloud Functions via the Admin SDK, which bypasses rules). If the
+// client could write those, a modified client would grant itself entitlement or reset its quota —
+// defeating the whole server-side trust boundary.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      // Profile doc (body stats + computed targets) — client read/write. Rules don't cascade
+      // to subcollections, so the entries/days/plan/quota matches below are independent.
+      allow read, write: if isOwner(uid);
+
+      // Client-owned: logged meals + per-day rollups.
+      match /entries/{entryId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /days/{dayId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Backend-owned: client may READ its own (to show entitlement + remaining scans) but
+      // never write. The Admin SDK in Cloud Functions writes these.
+      match /plan/{doc} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      match /quota/{doc} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      match /scans/{scanId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      // Raw webhook receipts: never client-visible.
+      match /webhooks/{document=**} {
+        allow read, write: if false;
+      }
     }
   }
 }

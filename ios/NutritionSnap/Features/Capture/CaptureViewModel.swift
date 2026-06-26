@@ -22,6 +22,9 @@ final class CaptureViewModel {
     private(set) var message: String?
     /// The reviewer's optional note — extra context appended to the prompt. Bound by the review UI.
     var note: String = ""
+    /// Raised when the server declines a scan on quota/entitlement grounds — the capture screen
+    /// presents the gentle paywall. Two-way so the sheet's binding can clear it on dismiss.
+    var showPaywall = false
     /// True when the staged photo came from the live camera (vs the library). Camera snaps are
     /// saved to the user's Photos on log; library picks already live there.
     private var fromCamera = false
@@ -78,6 +81,17 @@ final class CaptureViewModel {
                 entry = nil
                 message = meal.balanceNote
                 phase = .notFood
+            }
+        } catch EstimationError.quotaReached {
+            // Quota/entitlement decline. Don't show an error — keep the staged photo + note on the
+            // review step and raise the gentle paywall. If they're *already* subscribed, the
+            // server's entitlement mirror (RevenueCat webhook → plan/current) is just lagging a
+            // beat; say so calmly and let them retry rather than re-show the paywall.
+            phase = .reviewing
+            if SubscriptionStore.shared.isSubscribed {
+                message = "You're all set — activating your subscription. Tap Analyze again in a moment."
+            } else {
+                showPaywall = true
             }
         } catch {
             fail(error)

@@ -22,6 +22,27 @@ Important architecture change now accepted in `PRD.md`:
 - Client-side direct Gemini remains useful for current dev, but production scan processing
   should migrate behind the backend LLM router.
 
+## v1 Paywall Scope Decision (2026-06-26, grill-resolved) — branch `m6-paywall`
+
+The "add login" task was reframed: **login isn't needed to monetize** (StoreKit bills the
+Apple ID; RevenueCat keys off `appUserID = Firebase anon uid`). v1 ships a **server-enforced
+paywall on anonymous auth**; Apple/Google sign-in is **deferred**. This compresses the backend
+milestones below:
+
+- **Collapse M5 + M6 + M8 + M9** into one lean path: a single `scanMeal(imageBase64, note)`
+  callable that verifies Auth + App Check + entitlement + quota, calls Gemini server-side
+  (inline bytes), and commits/refunds the credit in one invocation.
+- **Skip M7 (Cloudflare R2)** entirely — inline image bytes, photos stay on-device. Revisit R2
+  only if paid original-retention becomes a feature.
+- **Free tier = 3 *lifetime* scans** (not M6's monthly 20/3). Premium = monthly + annual, each
+  with a 7-day Apple free trial; the premium monthly scan cap is retained to bound cost.
+- **Paywall UI:** custom SwiftUI (the brand-fit version of M10's "plan UI"), not RevenueCat's
+  prebuilt Paywalls.
+- Fix the 2026-06-12 review findings as the code goes real (webhook CANCELLATION → active-until-
+  expiry, header-only webhook secret, quota read inside the transaction, `enforceAppCheck`,
+  `PlanTier.unknown` tolerant decode).
+- Still out of v1: account-deletion/export UI (PRD Q#11 — launch item), OCR label path (v2).
+
 ## Milestone 4A — Current App Hardening
 
 Goal: make the existing single-user app feel complete enough to keep using while backend

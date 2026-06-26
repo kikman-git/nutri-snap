@@ -16,7 +16,8 @@ struct CaptureScreen: View {
     private let clip = RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
 
     var body: some View {
-        ZStack {
+        @Bindable var model = model
+        return ZStack {
             Theme.Palette.background.ignoresSafeArea()
                 .onTapGesture { noteFocused = false }       // tap the field away
 
@@ -51,6 +52,13 @@ struct CaptureScreen: View {
                 await store.update(edited, replacing: entry)
                 model.replaceLoggedEntry(edited)
             }
+        }
+        // Quota/entitlement decline raised the paywall (CaptureViewModel.confirm). The staged photo
+        // + note are kept, so after a successful purchase they just tap Analyze again.
+        .sheet(isPresented: $model.showPaywall) {
+            // Re-inject explicitly: top-level sheets don't reliably inherit @Observable env objects
+            // on this SDK (same reason OnboardingView re-injects the store).
+            PaywallView().environment(SubscriptionStore.shared)
         }
         .task {
             // Headless screenshot hooks (mirror RootView's START_TAB): the picker, the live camera,
@@ -178,6 +186,15 @@ struct CaptureScreen: View {
                     .padding(Theme.Spacing.md)
                     .background(Theme.Palette.surface,
                                 in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
+            }
+
+            // Gentle hint when a fresh subscription is still activating (webhook lag) — shown on the
+            // review step so they know to retry without seeing the paywall again.
+            if let message = model.message {
+                Text(message)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Palette.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack(spacing: Theme.Spacing.md) {

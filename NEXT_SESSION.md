@@ -12,6 +12,60 @@ Milestones **1–5 + 4A done**; app builds + runs on the iPhone 16 Plus sim (iOS
 
 - **M5 just landed — onboarding + personalized targets.** First-run gate collects body stats → **Mifflin–St Jeor** daily target (`Models/NutritionMath.swift`); micro references **personalized by sex**; edit later via the person icon in the Trends header. Verified on sim (math correct; fixed a segmented-`Picker` binding bug). Hook: `FORCE_ONBOARDING=1` + `USE_SAMPLE=1`.
 - **Repo is public / open-source.** Secret audit done: **no API keys or credentials in any tracked file or in git history.** `GoogleService-Info.plist` is gitignored + was never committed; Cloud Functions read every secret from `process.env` (nothing hardcoded). App Check **debug tokens** were scrubbed from the docs — if any were ever live, delete them in Firebase console (App Check → Manage debug tokens). Personal email scrubbed from this doc.
+- **Direction (2026-06-26) — next build is M6: a server-enforced paywall, *no login* (grill-resolved).** Branch `m6-paywall`. The Apple Developer Program is now **paid** ✅. See the Active section below.
+
+## Active: M6 — server-enforced paywall (no login) · branch `m6-paywall`
+
+Decided via design grill (2026-06-26). The "add login" task was reframed: login isn't needed
+to take money (StoreKit bills the Apple ID; RevenueCat tracks entitlement against
+`appUserID = Firebase anon uid`). So **login is deferred** and the goal — cover infra cost —
+is met by a **paywall with a full backend trust boundary**.
+
+**Locked decisions**
+- **Identity:** stay anonymous Firebase auth; defer Apple/Google sign-in (revisit when
+  cross-device data continuity matters). RevenueCat `appUserID = Firebase uid`.
+- **Free taste:** 3 *lifetime* free scans, enforced server-side (reinstall resets it — ok;
+  harden with DeviceCheck only if abused).
+- **Subscription:** Monthly + Annual, each with a 7-day Apple free trial. Prices set in ASC
+  (~¥800 / ~¥5,800 start; infra cost is <$1/user/mo, so margin isn't the constraint).
+- **Enforcement:** full backend trust boundary — Gemini moves server-side; the only path to it
+  is the authenticated + App-Check-enforced + quota-checked callable.
+- **Transport:** inline image bytes in ONE `scanMeal` callable (reserve → Gemini →
+  commit/refund, all server-side). **No R2, no Cloud Storage** (skips milestone M7); photos
+  stay on-device.
+- **Paywall:** custom SwiftUI on the Theme, driven by RevenueCat offerings + a Restore button.
+- **Out of scope:** meal_photo only (OCR = v2), no login, no R2/cloud photos, no account-
+  deletion UI (flag for launch — PRD Q#11).
+
+This **collapses milestones M5/M6/M8/M9 and drops M7** (see `IMPLEMENTATION_MILESTONES.md` →
+"v1 Paywall Scope Decision" + the 2026-06-12 review findings = the scaffold bugs to fix as we go).
+
+**Build order (backend-first) — status 2026-06-26**
+1. ✅ **DONE** (commit `16359b7`) — `functions/`: collapsed the R2 multi-call scaffold into one
+   `scanMeal(imageBase64, note)`; server-side Gemini via **REST `fetch`** (no new dep; key in
+   Secret Manager; ported `GeminiPrompt` + the thinking cap); 3-lifetime free + monthly paid cap;
+   `enforceAppCheck: true`; webhook fixed (CANCELLATION→active-until-expiry, header-only secret).
+   Typechecks.
+2. ✅ **DONE** (commit `16359b7`) — `firestore.rules`: `plan`/`quota`/`scans` backend-write-only,
+   client read-only.
+3. ✅ **DONE** (commit `eef966a`) — `ios/`: `BackendMealEstimator` calls `scanMeal` via
+   FirebaseFunctions; on-device Gemini retired behind `ONDEVICE_GEMINI=1`. Builds + mock smoke OK.
+4. ✅ **DONE (this session)** — RevenueCat SDK + paywall, builds clean (RevenueCat 5.80.0):
+   - `SubscriptionStore` (`Services/`) — configures RevenueCat, follows Firebase auth so
+     `appUserID == uid`, exposes `isSubscribed`/`offering`/purchase/restore/manage. Key from the
+     **`REVENUECAT_API_KEY` env var** (`RevenueCatConfig`), not committed (public repo).
+   - **Custom SwiftUI paywall** (`Features/Paywall/PaywallView.swift`) on the Theme — Annual+Monthly
+     from the `default` offering, 7-day trial copy, Restore, terms/privacy. Entitlement `premium`.
+   - **Gating:** `scanMeal` `.quotaReached` → paywall (photo kept); webhook-lag race handled
+     ("activating… tap Analyze again", no paywall loop). Upgrade/Manage row in `ProfileSettingsSheet`.
+   - **Note:** did *not* wire `PlanService`/`PlanModels` — they're a dead client-quota seam under the
+     backend-enforced model. Left untouched. Two new skills: `revenuecat-ios`, `nutrisnap-ios`.
+   - ⏳ **Operational only (you):** deploy backend (Part A), RevenueCat/ASC (Part B), set
+     `REVENUECAT_API_KEY`, then live-verify on a device w/ sandbox tester. See `M6_SETUP.md`.
+
+**➡️ Operational setup + deploy: [`M6_SETUP.md`](M6_SETUP.md)** (Apple Dev Program is PAID ✅).
+⚠️ **The app can't scan until Part A (Blaze + secrets + deploy + App Check token) is done** — the
+client now calls the backend. Part B (RevenueCat/ASC) unblocks the paywall.
 
 ## Next: device + App Store track
 
