@@ -28,7 +28,19 @@ struct RootView: View {
         // Screenshot hooks (CLAUDE.md): MOCK_RESULT / MOCK_SLOW force the mock estimator so the
         // capture states can be driven headlessly without a live Gemini call.
         let useMock = env["MOCK_RESULT"] != nil || env["MOCK_SLOW"] != nil
-        let resolved = estimator ?? (useMock ? MockMealEstimator() : GeminiMealEstimator.shared)
+        // Production sends the photo to the `scanMeal` Cloud Function (server-side Gemini, with
+        // App Check + quota enforced). `ONDEVICE_GEMINI=1` keeps the old direct-to-Gemini path
+        // for dev/offline iteration; mock hooks still win for headless screenshots.
+        let resolved: MealEstimating
+        if let estimator {
+            resolved = estimator
+        } else if useMock {
+            resolved = MockMealEstimator()
+        } else if env["ONDEVICE_GEMINI"] != nil {
+            resolved = GeminiMealEstimator.shared
+        } else {
+            resolved = BackendMealEstimator.shared
+        }
         _model = State(initialValue: CaptureViewModel(estimator: resolved))
         // Test hook: `START_TAB=trends|calendar` opens straight to a tab (used for screenshots).
         switch env["START_TAB"] {

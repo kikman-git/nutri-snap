@@ -60,6 +60,10 @@ targets:
         product: FirebaseAuth
       - package: Firebase
         product: FirebaseFirestore
+      # M6: the capture path now calls the `scanMeal` Cloud Function (server-side Gemini +
+      # quota). Same Firebase package — no new SwiftPM resolution, just another product.
+      - package: Firebase
+        product: FirebaseFunctions
 
 schemes:
   NutritionSnap:

@@ -15,11 +15,15 @@ protocol MealEstimating {
 enum EstimationError: LocalizedError {
     case offline
     case failed
+    /// The backend declined the scan on quota/entitlement grounds (free taste used up, or no
+    /// active subscription). The capture flow turns this into the gentle paywall, not an error.
+    case quotaReached
 
     var errorDescription: String? {
         switch self {
         case .offline: return "You're offline — we'll read this once you're back."
         case .failed:  return "We couldn't quite read that one. Mind trying again?"
+        case .quotaReached: return "You've used your free scans for now."
         }
     }
 }
