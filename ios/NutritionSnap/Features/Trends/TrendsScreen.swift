@@ -11,6 +11,7 @@ struct TrendsScreen: View {
 
     init(reflector: WeeklyReflecting = GeminiReflector.shared) {
         self.reflector = reflector
+        _showReflection = State(initialValue: ProcessInfo.processInfo.environment["OPEN_REFLECT"] != nil)
     }
 
     private var target: Nutrients { store.target }

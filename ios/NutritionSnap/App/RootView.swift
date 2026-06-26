@@ -13,6 +13,7 @@ struct RootView: View {
     @State private var selection: Tab
     @State private var store: MealStore
     @State private var model: CaptureViewModel
+    private let reflector: WeeklyReflecting
     /// Snap-tab sub-state: false = Today·Home, true = the capture flow (viewfinder → … → logged).
     @State private var capturing = false
     @State private var showGaps = false
@@ -37,6 +38,9 @@ struct RootView: View {
             resolved = BackendMealEstimator.shared
         }
         _model = State(initialValue: CaptureViewModel(estimator: resolved))
+        // Reflect is an on-device text call; under sample/mock screenshots it can't reach the
+        // network, so swap in the canned reflector.
+        reflector = (env["USE_SAMPLE"] != nil || useMock) ? MockReflector() : GeminiReflector.shared
         _forcePaywall = State(initialValue: env["FORCE_PAYWALL"] != nil)
         _showGaps = State(initialValue: env["OPEN_GAPS"] != nil)
         // Capture screenshot hooks live in CaptureScreen.task, so it must be mounted — open the
@@ -54,7 +58,7 @@ struct RootView: View {
         ZStack {
             Theme.Palette.background.ignoresSafeArea()
 
-            screen(.trends)   { TrendsScreen() }
+            screen(.trends)   { TrendsScreen(reflector: reflector) }
             screen(.snap)     { snapTab }
             screen(.calendar) { CalendarScreen(onSnap: { goToSnap() }) }
         }
