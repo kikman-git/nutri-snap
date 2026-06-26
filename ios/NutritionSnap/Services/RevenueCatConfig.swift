@@ -10,7 +10,7 @@ import Foundation
 /// launched by Xcode). Before shipping, bake the key in — e.g. a git-ignored `Secrets.swift`
 /// returning it here, or an `.xcconfig` build setting surfaced via Info.plist. RevenueCat's public
 /// SDK key is publishable (it's extractable from any shipped app), so baking it in is safe; we keep
-/// it out of *this* repo only because the repo is open-source. See `M6_SETUP.md`.
+/// it out of *this* repo only because the repo is open-source. See `docs/M6_SETUP.md`.
 ///
 /// Today's value is a RevenueCat **Test Store** key (`test_…`), good for wiring + sandbox testing.
 /// Production needs the real Apple SDK key (`appl_…`) once the App Store Connect products are live.

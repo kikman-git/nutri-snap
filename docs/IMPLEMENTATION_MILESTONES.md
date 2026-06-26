@@ -78,6 +78,12 @@ Acceptance:
 - Calendar bands and Trends use the stored target.
 - Skipping onboarding still produces a valid calendar target.
 
+> ⚠️ **M5–M10 below are the original R2 multi-call plan — SUPERSEDED by the 2026-06-26 scope
+> decision above.** What actually shipped (M6): M5 + M6 + M8 + M9 collapsed into one `scanMeal`
+> callable; **M7 (Cloudflare R2) dropped** (inline bytes, on-device photos); the custom paywall
+> stands in for M10's plan UI. Kept below for historical reference + if paid image-retention (R2)
+> is ever revisited. Current truth: `NEXT_SESSION.md`.
+
 ## Milestone 5 — Trusted Backend Foundation
 
 Goal: establish the server-side trust boundary before moving expensive scan work off-device.
@@ -194,10 +200,12 @@ disjoint write scopes:
 | Popper (`019eb4ae-921c-7601-ad2f-0266666d39cc`) | `ios/NutritionSnap/Services/PlanService.swift`, `ios/NutritionSnap/Models/PlanModels.swift` only | Add client-side plan/quota models and a mockable service seam that can later call backend quota endpoints. | Integrated; builds; reviewed 2026-06-12 — dormant by design (not wired into UI until M6/M9) |
 | Gauss (`019eb4ae-c27a-7b20-9392-712ed29a09ce`) | `ios/NutritionSnap/Features/EditMeal/`, targeted edits in Capture/Calendar/MealStore if needed | Implement meal edit UI and store update path for existing logged meals. | Integrated; **verified end-to-end on simulator 2026-06-12** (sheet prefill → save → cold-relaunch persistence → rollup delta applied exactly once) |
 
-### Review findings (2026-06-12) — fix when the owning milestone starts
+### Review findings (2026-06-12) — mostly RESOLVED in M6
 
-Placeholder-stage issues found reviewing the worker patches. None block current use;
-all become real before their milestone ships:
+**Status (2026-06-26):** most were fixed in the M6 `scanMeal` collapse (webhook CANCELLATION →
+active-until-expiry, header-only secret, `enforceAppCheck: true`, quota reserve/commit in one
+call); `PlanModels`/`PlanService` is now a **dead seam** (unused under backend enforcement). Kept
+for historical reference:
 
 - **M6 / `functions/src/index.ts` `revenuecatWebhook`:** `CANCELLATION` immediately sets
   tier `free` — wrong; cancellation only disables auto-renew, entitlement lasts until

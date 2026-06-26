@@ -1,6 +1,6 @@
 # Nutrition Snap — Product Design Document
 
-> **Working title:** Nutrition Snap *(placeholder — rename later)*
+> **Working title:** Nutri Snap
 > **Status:** v0 design, pre-build, architecture merged
 > **Author:** Phat Nguyen
 > **Last updated:** 2026-06-11

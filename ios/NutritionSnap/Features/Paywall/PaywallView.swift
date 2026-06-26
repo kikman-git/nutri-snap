@@ -6,7 +6,7 @@ private enum PaywallLinks {
     /// Apple's standard auto-renewable-subscription EULA.
     static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
     /// TODO(launch): replace with the hosted privacy policy URL (we send food photos to Gemini +
-    /// use Firebase) before App Store submission — see NEXT_SESSION.md "Compliance".
+    /// use Firebase) before App Store submission — see docs/NEXT_SESSION.md "Compliance".
     static let privacy = URL(string: "https://www.apple.com/legal/privacy/")!
 }
 
