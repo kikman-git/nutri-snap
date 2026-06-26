@@ -12,7 +12,7 @@ description: >-
 
 How this app monetizes: a **server-enforced paywall, no login**. Anonymous Firebase auth + a
 RevenueCat subscription billed to the Apple ID. 3 lifetime free scans, then Monthly/Annual (7-day
-trial). Decided via design grill 2026-06-26 (see `NEXT_SESSION.md` → "Active: M6").
+trial). Decided via design grill 2026-06-26 (see `docs/NEXT_SESSION.md` → "Active: M6").
 
 ## The five invariants (don't regress these)
 
@@ -85,7 +85,7 @@ nothing. Don't extend them or wire them to RevenueCat — the backend owns reser
 ## Operational setup
 
 Account/ASC steps (Blaze, Gemini key + webhook secret, ASC subscriptions + 7-day trials,
-RevenueCat project/entitlement/offering/webhook) are in **`M6_SETUP.md`**. The webhook URL comes
+RevenueCat project/entitlement/offering/webhook) are in **`docs/M6_SETUP.md`**. The webhook URL comes
 from `firebase deploy`; the shared secret must match Secret Manager's `REVENUECAT_WEBHOOK_SHARED_SECRET`.
 
 ## Testing
@@ -94,5 +94,5 @@ from `firebase deploy`; the shared secret must match Secret Manager's `REVENUECA
   Live purchases need a **sandbox tester** Apple ID (ASC → Users and Access → Sandbox) on a device.
 - Without the key, the app runs normally and the paywall shows its unavailable state — fine for
   unrelated work.
-- Free→paid path needs the backend deployed (`M6_SETUP.md` Part A) + a registered App Check token,
+- Free→paid path needs the backend deployed (`docs/M6_SETUP.md` Part A) + a registered App Check token,
   since `scanMeal` is the gate. `ONDEVICE_GEMINI=1` bypasses the backend for capture-only dev.

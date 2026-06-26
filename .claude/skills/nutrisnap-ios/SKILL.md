@@ -13,7 +13,7 @@ description: >-
 Native SwiftUI app under `ios/` (monorepo: `functions/` backend + `android/` placeholder at root).
 Structure and review dimensions are inspired by Paul Hudson's `swiftui-pro` agent skill — **but
 pinned to this project's targets**, which differ (see below). `CLAUDE.md` is the full build/milestone
-history; `PRD.md` is product truth; `NEXT_SESSION.md` is current state.
+history; `docs/PRD.md` is product truth; `docs/NEXT_SESSION.md` is current state.
 
 ## Targets — read first (these differ from generic SwiftUI skills)
 

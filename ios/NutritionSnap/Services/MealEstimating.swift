@@ -3,7 +3,7 @@ import Foundation
 /// The seam between the capture UI and the AI (PRD §6). One meal photo → a structured
 /// estimate. `MockMealEstimator` backs it today; the real Firebase AI Logic → Gemini
 /// implementation drops in behind this same protocol once Firebase is wired (milestone 2
-/// prerequisites in NEXT_SESSION.md). The UI never knows which is which.
+/// prerequisites in docs/NEXT_SESSION.md). The UI never knows which is which.
 protocol MealEstimating {
     /// JPEG bytes of one meal photo (+ an optional user note for extra context) → the §6
     /// contract. The note is folded into the prompt. Throws `EstimationError` on failure.
