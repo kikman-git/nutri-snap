@@ -30,10 +30,17 @@ targets:
     type: application
     platform: iOS
     sources:
-      - NutritionSnap
+      - path: NutritionSnap
+        # Info.plist is referenced via INFOPLIST_FILE below — keep it out of the
+        # build phases so it isn't also copied into the bundle as a resource.
+        excludes:
+          - "Info.plist"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kikman.nutrisnap
+        # Partial plist (UIAppFonts only); GENERATE_INFOPLIST_FILE stays YES and
+        # Xcode merges the generated keys + INFOPLIST_KEY_* into it.
+        INFOPLIST_FILE: NutritionSnap/Info.plist
         PRODUCT_NAME: NutritionSnap
         TARGETED_DEVICE_FAMILY: "1" # iPhone only for now
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

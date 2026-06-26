@@ -18,6 +18,8 @@ struct RootView: View {
     /// Screenshot hook: present the paywall on launch (the CLI can't tap Settings → Upgrade or
     /// exhaust the free quota). Pair with `REVENUECAT_API_KEY` to render live offerings.
     @State private var forcePaywall: Bool = false
+    /// TEMP Phase-0 hook: GALLERY=1 shows the Warm Bloom component gallery. Remove after Phase 1.
+    @State private var showGallery: Bool = false
     @Environment(\.scenePhase) private var scenePhase
 
     init(store: MealStore? = nil, estimator: MealEstimating? = nil) {
@@ -46,6 +48,7 @@ struct RootView: View {
         }
         _model = State(initialValue: CaptureViewModel(estimator: resolved))
         _forcePaywall = State(initialValue: env["FORCE_PAYWALL"] != nil)
+        _showGallery = State(initialValue: env["GALLERY"] != nil)
         // Test hook: `START_TAB=trends|calendar` opens straight to a tab (used for screenshots).
         switch env["START_TAB"] {
         case "trends":   _selection = State(initialValue: .trends)
@@ -76,6 +79,7 @@ struct RootView: View {
         // Screenshot hook only (FORCE_PAYWALL): the production trigger is CaptureViewModel.confirm
         // raising the paywall on a quota/entitlement decline, plus the Settings upgrade row.
         .sheet(isPresented: $forcePaywall) { PaywallView().environment(SubscriptionStore.shared) }
+        .fullScreenCover(isPresented: $showGallery) { ComponentGallery() }   // TEMP Phase-0
         // Run the camera only while the Snap tab is showing; release it elsewhere.
         .task(id: selection) {
             if selection == .snap { await model.camera.start() } else { model.camera.stop() }
