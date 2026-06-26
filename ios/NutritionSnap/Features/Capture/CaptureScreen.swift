@@ -5,6 +5,8 @@ import PhotosUI
 struct CaptureScreen: View {
     @Environment(MealStore.self) private var store
     let model: CaptureViewModel
+    var onClose: () -> Void = {}
+    var onOpenGaps: () -> Void = {}
     @State private var pickerItem: PhotosPickerItem?
     @FocusState private var noteFocused: Bool
     @State private var editingEntry: Entry?
@@ -82,6 +84,10 @@ struct CaptureScreen: View {
 
     @ViewBuilder private var idleView: some View {
         VStack(spacing: Theme.Spacing.lg) {
+            HStack {
+                circleButton("xmark") { onClose() }
+                Spacer()
+            }
             liveViewfinder
             libraryControl
             if let recent = store.recentEntry { RecentMealRow(entry: recent) }
@@ -273,7 +279,9 @@ struct CaptureScreen: View {
                            references: store.references,
                            dailyKcal: store.target.kcal,
                            onEdit: { editingEntry = entry },
-                           onDelete: { Task { await store.delete(entry); model.reset() } })
+                           onDelete: { Task { await store.delete(entry); onClose() } },
+                           onClose: onClose,
+                           onOpenGaps: onOpenGaps)
         }
     }
 
@@ -413,6 +421,8 @@ private struct LoggedHeroCard: View {
     let dailyKcal: Double
     var onEdit: () -> Void
     var onDelete: () -> Void
+    var onClose: () -> Void
+    var onOpenGaps: () -> Void
 
     private let bloomMicros: [Nutrient] = [.iron, .zinc, .magnesium, .potassium, .vitaminA, .vitaminC, .fiber]
 
@@ -449,6 +459,15 @@ private struct LoggedHeroCard: View {
                 Text(mealName).font(Theme.Typography.title).foregroundStyle(.white)
             }
             .padding(Theme.Spacing.md)
+        }
+        .overlay(alignment: .topTrailing) {
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 32, height: 32).background(.black.opacity(0.32), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(Theme.Spacing.sm)
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
     }
@@ -518,14 +537,23 @@ private struct LoggedHeroCard: View {
     }
 
     private var gapsNudge: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "leaf.fill").foregroundStyle(Theme.Palette.sageText)
-            Text("A little low on \(lowMicros.map { $0.displayName }.joined(separator: " & ")) today")
-                .font(Theme.Typography.label).foregroundStyle(Theme.Palette.ink)
-            Spacer(minLength: 0)
+        Button(action: onOpenGaps) {
+            HStack(spacing: Theme.Spacing.sm) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Low on \(lowMicros.map { $0.displayName }.joined(separator: " & "))")
+                        .font(Theme.Typography.label).foregroundStyle(Theme.Palette.ink)
+                    Text("See easy ways to fill the gaps ›")
+                        .font(Theme.Typography.caption).foregroundStyle(Theme.Palette.sageText)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 34, height: 34).background(Theme.Palette.sage, in: Circle())
+            }
+            .padding(Theme.Spacing.md)
+            .background(Theme.Palette.sageTintBg, in: RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous))
         }
-        .padding(Theme.Spacing.md)
-        .background(Theme.Palette.sageTintBg, in: RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous))
+        .buttonStyle(.plain)
     }
 
     private var actions: some View {

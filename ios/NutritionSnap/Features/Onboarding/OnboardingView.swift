@@ -5,21 +5,31 @@ import SwiftUI
 /// default (gentle, low-friction — it's editable later in Settings). Presented by `RootView`
 /// while `store.needsOnboarding`.
 struct OnboardingView: View {
+    enum Step { case welcome, profile }
+
     @Environment(MealStore.self) private var store
+    @State private var step: Step = .welcome
     @State private var inputs = ProfileInputs()
     @State private var saving = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                header
-                ProfileFieldsView(inputs: $inputs)
-                TargetPreviewCard(target: inputs.target)
-                buttons
+        Group {
+            switch step {
+            case .welcome:
+                WelcomeView { withAnimation(.easeInOut) { step = .profile } }
+            case .profile:
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        header
+                        ProfileFieldsView(inputs: $inputs)
+                        TargetPreviewCard(target: inputs.target)
+                        buttons
+                    }
+                    .padding(Theme.Spacing.lg)
+                }
+                .background(Theme.Palette.background.ignoresSafeArea())
             }
-            .padding(Theme.Spacing.lg)
         }
-        .background(Theme.Palette.background.ignoresSafeArea())
         .onAppear { if let p = store.profile { inputs = ProfileInputs(p) } }
     }
 

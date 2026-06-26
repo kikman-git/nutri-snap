@@ -269,7 +269,33 @@ These need **no** model/prompt/backend change — only the chosen nutrient label
 
 ---
 
-## Phase 3 · New screens & features (need a decision and/or model · AI · backend work)
+## Phase 3 · New screens & features — ✅ DONE (2026-06-26)
+
+**All three net-new screens built + verified on the iPhone 16 Plus sim**, to the imported design.
+- **3.1 Welcome** (`Features/Onboarding/WelcomeView.swift`) — value-prop splash, code-drawn spot
+  illustration (sun over sage hills), wordmark, clay accent line, "Get started". **Sign-in line dropped
+  (D7).** Prepended as `OnboardingView`'s first step (`Step {welcome, profile}`).
+- **3.2 Today·Home** (`Features/Home/TodayHomeView.swift`) — the **D4 home-first** Snap-tab idle:
+  nameless greeting **(D8)**, today kcal `ConicRing` + sage accent line + macro row, today's-meals list
+  (energy dots), sage gap teaser → Fill the Gaps. **Navigation shift in `RootView`:** a `capturing` flag
+  flips Home ↔ the inline capture flow (tab bar + shared FAB stay visible — capture is *not* a cover, per
+  the design); FAB = Home→viewfinder→shutter; close-X returns Home; camera runs only while `capturing`.
+- **3.3 Energy Read** — already shipped in the Phase-1 data foundation (`EnergyShape` D1, model-estimated);
+  the ribbon renders on the Logged hero + Today/Day meal rows.
+- **3.4 Fill the Gaps** (`Features/FillGaps/FillTheGapsView.swift` + `Models/NutrientFoods.swift`) —
+  per-shortfall cards (today's adequacy vs `store.references`) each with 3 everyday-food tiles from a
+  curated static table. **Reminder CTA dropped (D9).** **Plus-gated** — `RootView.requestGaps()` opens it
+  (`fullScreenCover`) when subscribed, else the paywall; reached from the Today teaser + the Logged nudge
+  (now a tappable row). Hook: `OPEN_GAPS=1`.
+- **3.5 Structured Reflect** — kept as prose in the new frame (**D6** recommended default); structured
+  highlights remain a later option.
+
+⚠️ **D4 supersedes PRD §5.2 (capture-first open) — the PRD is not yet updated.** Live D1/D2 (energy +
+the 4 new micros) still need the **M6 backend deploy** to verify end-to-end.
+
+*(Original plan kept below for reference.)*
+
+### (original) New screens & features — needed a decision and/or model · AI · backend work
 
 Ordered by cost. Each maps to a design screen the app doesn't have yet.
 
