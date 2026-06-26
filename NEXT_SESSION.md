@@ -50,10 +50,18 @@ This **collapses milestones M5/M6/M8/M9 and drops M7** (see `IMPLEMENTATION_MILE
    client read-only.
 3. ✅ **DONE** (commit `eef966a`) — `ios/`: `BackendMealEstimator` calls `scanMeal` via
    FirebaseFunctions; on-device Gemini retired behind `ONDEVICE_GEMINI=1`. Builds + mock smoke OK.
-4. ⏳ **NEXT (paused — awaiting operational setup):** RevenueCat SDK + `configure(appUserID: uid)`,
-   wire `PlanService`/`PlanModels` to `customerInfo`, **custom SwiftUI paywall** + gating (3 free
-   used & not entitled → paywall; also from Settings), read `quota/summary` for "N free left".
-   Need from you first: the RevenueCat public SDK key + the ASC products (see runbook).
+4. ✅ **DONE (this session)** — RevenueCat SDK + paywall, builds clean (RevenueCat 5.80.0):
+   - `SubscriptionStore` (`Services/`) — configures RevenueCat, follows Firebase auth so
+     `appUserID == uid`, exposes `isSubscribed`/`offering`/purchase/restore/manage. Key from the
+     **`REVENUECAT_API_KEY` env var** (`RevenueCatConfig`), not committed (public repo).
+   - **Custom SwiftUI paywall** (`Features/Paywall/PaywallView.swift`) on the Theme — Annual+Monthly
+     from the `default` offering, 7-day trial copy, Restore, terms/privacy. Entitlement `premium`.
+   - **Gating:** `scanMeal` `.quotaReached` → paywall (photo kept); webhook-lag race handled
+     ("activating… tap Analyze again", no paywall loop). Upgrade/Manage row in `ProfileSettingsSheet`.
+   - **Note:** did *not* wire `PlanService`/`PlanModels` — they're a dead client-quota seam under the
+     backend-enforced model. Left untouched. Two new skills: `revenuecat-ios`, `nutrisnap-ios`.
+   - ⏳ **Operational only (you):** deploy backend (Part A), RevenueCat/ASC (Part B), set
+     `REVENUECAT_API_KEY`, then live-verify on a device w/ sandbox tester. See `M6_SETUP.md`.
 
 **➡️ Operational setup + deploy: [`M6_SETUP.md`](M6_SETUP.md)** (Apple Dev Program is PAID ✅).
 ⚠️ **The app can't scan until Part A (Blaze + secrets + deploy + App Check token) is done** — the

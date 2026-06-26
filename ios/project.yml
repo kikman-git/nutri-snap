@@ -20,6 +20,10 @@ packages:
   Firebase:
     url: https://github.com/firebase/firebase-ios-sdk
     from: "11.0.0"
+  # M6 paywall: RevenueCat client SDK. The `-spm` repo is the lightweight SPM-only distribution.
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios-spm.git
+    from: "5.0.0"
 
 targets:
   NutritionSnap:
@@ -64,6 +68,11 @@ targets:
       # quota). Same Firebase package — no new SwiftPM resolution, just another product.
       - package: Firebase
         product: FirebaseFunctions
+      # M6 paywall: RevenueCat client SDK (entitlement + purchase/restore). The server is the
+      # enforcement boundary (scanMeal); this is the paywall UX only. Custom SwiftUI paywall, so
+      # we take the `RevenueCat` product only — not `RevenueCatUI`.
+      - package: RevenueCat
+        product: RevenueCat
 
 schemes:
   NutritionSnap:

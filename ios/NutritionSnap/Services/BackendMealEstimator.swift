@@ -30,15 +30,21 @@ final class BackendMealEstimator: MealEstimating {
             }
             let data = try JSONSerialization.data(withJSONObject: meal)
             let estimated = try JSONDecoder().decode(EstimatedMeal.self, from: data)
-            if let remaining = dict["remainingFreeScans"] as? Int {
-                log.debug("scanMeal ok · remaining free: \(remaining)")
-            }
+            // Surface the server-authoritative free-scan count for the gentle "N left" UI. `null`
+            // (a paid tier) decodes to nil → unlimited within the monthly cap.
+            let remaining = (dict["remainingFreeScans"] as? NSNumber)?.intValue
+            await MainActor.run { SubscriptionStore.shared.noteRemainingFreeScans(remaining) }
+            log.debug("scanMeal ok · remaining free: \(remaining.map(String.init) ?? "n/a", privacy: .public)")
             return estimated
         } catch let error as NSError where error.domain == FunctionsErrorDomain {
             // Map the backend's gentle rejections. Over free quota / no entitlement → paywall;
             // unauthenticated/unavailable network → offline-ish gentle retry.
             switch FunctionsErrorCode(rawValue: error.code) {
-            case .resourceExhausted, .permissionDenied:
+            case .resourceExhausted:
+                // Free taste used up — reflect 0 left so the UI is honest before the paywall.
+                await MainActor.run { SubscriptionStore.shared.noteRemainingFreeScans(0) }
+                throw EstimationError.quotaReached
+            case .permissionDenied:
                 throw EstimationError.quotaReached
             case .unavailable, .deadlineExceeded:
                 throw EstimationError.offline

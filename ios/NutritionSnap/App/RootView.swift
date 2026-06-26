@@ -15,6 +15,9 @@ struct RootView: View {
     @State private var model: CaptureViewModel
     /// Screenshot hook: force the onboarding gate open (the CLI can't tap through it otherwise).
     private let forceOnboarding: Bool
+    /// Screenshot hook: present the paywall on launch (the CLI can't tap Settings → Upgrade or
+    /// exhaust the free quota). Pair with `REVENUECAT_API_KEY` to render live offerings.
+    @State private var forcePaywall: Bool = false
     @Environment(\.scenePhase) private var scenePhase
 
     init(store: MealStore? = nil, estimator: MealEstimating? = nil) {
@@ -42,6 +45,7 @@ struct RootView: View {
             resolved = BackendMealEstimator.shared
         }
         _model = State(initialValue: CaptureViewModel(estimator: resolved))
+        _forcePaywall = State(initialValue: env["FORCE_PAYWALL"] != nil)
         // Test hook: `START_TAB=trends|calendar` opens straight to a tab (used for screenshots).
         switch env["START_TAB"] {
         case "trends":   _selection = State(initialValue: .trends)
@@ -60,11 +64,18 @@ struct RootView: View {
         }
         .safeAreaInset(edge: .bottom) { tabBar }
         .environment(store)
+        .environment(SubscriptionStore.shared)
+        // Configure RevenueCat once on appear — a no-op without an API key (previews / sample /
+        // dev without the env var), and runs well before any paywall is presented.
+        .task { SubscriptionStore.shared.configure() }
         // First-run gate (PRD §9 step 5): personalize the target before showing the tabs. Auto-
         // dismisses when onboarding writes the profile (`needsOnboarding` flips false).
         .fullScreenCover(isPresented: Binding(get: { showOnboarding }, set: { _ in })) {
             OnboardingView().environment(store)
         }
+        // Screenshot hook only (FORCE_PAYWALL): the production trigger is CaptureViewModel.confirm
+        // raising the paywall on a quota/entitlement decline, plus the Settings upgrade row.
+        .sheet(isPresented: $forcePaywall) { PaywallView().environment(SubscriptionStore.shared) }
         // Run the camera only while the Snap tab is showing; release it elsewhere.
         .task(id: selection) {
             if selection == .snap { await model.camera.start() } else { model.camera.stop() }

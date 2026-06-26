@@ -106,8 +106,14 @@ This is what flips `users/{uid}/plan/current` to entitled when someone subscribe
 expiry). Cancellation keeps them entitled until the period actually ends (handled in the webhook).
 
 ### B6. RevenueCat — public SDK key + sandbox tester
-- Project → **API keys** → copy the **public Apple SDK key** (`appl_…`). Hand it to me next session
-  to wire into the app (publishable, not a Secret-Manager secret).
+- Project → **API keys** → copy the **public Apple SDK key** (`appl_…`).
+- The app reads the key from the **`REVENUECAT_API_KEY` environment variable** (kept out of this
+  public repo). Set it in Xcode → **Edit Scheme → Run → Arguments → Environment Variables**, or for
+  the CLI as `SIMCTL_CHILD_REVENUECAT_API_KEY=…`. ⚠️ Env vars don't reach an **archived/TestFlight**
+  build — before shipping, bake the key into a git-ignored `Secrets.swift` (the public SDK key is
+  publishable, so that's safe; see the `revenuecat-ios` skill).
+- A RevenueCat **Test Store** key (`test_…`) works for wiring + paywall testing before ASC products
+  are live; switch to the `appl_…` key for real sandbox/production purchases.
 - ASC → **Users and Access → Sandbox** → create a sandbox tester Apple ID for purchase testing.
 
 ---
@@ -121,8 +127,15 @@ expiry). Cancellation keeps them entitled until the period actually ends (handle
 | ASC In-App Purchase key | RevenueCat dashboard | receipt validation |
 | App Check debug token | Firebase Console → App Check | unblocks `scanMeal` in dev |
 
-## Still to build (next coding session, after the above)
-- RevenueCat SDK in the app + `Purchases.configure(appUserID: firebaseUid)`.
-- Custom SwiftUI paywall (offerings → purchase + Restore + terms/privacy links).
-- Gating: 3 free used & not entitled → present the paywall (today `.quotaReached` only shows copy).
-- Read `users/{uid}/quota/summary` for the proactive "N free scans left" UI.
+## Client paywall — BUILT (this session)
+The RevenueCat SDK + custom paywall are **coded** (`SubscriptionStore`, `PaywallView`, gating in
+`CaptureViewModel`/`CaptureScreen`, upgrade/manage in `ProfileSettingsSheet`). Details + invariants:
+the **`revenuecat-ios`** skill. What's left is purely operational + live verification:
+- Do Part A (deploy backend) and Part B (RevenueCat/ASC) above.
+- Put your key in `REVENUECAT_API_KEY` (B6). Ensure the dashboard entitlement is **`premium`** and
+  the offering is **`default`** (the app's constants).
+- Verify on a device with a sandbox tester: 3 free scans → paywall → trial purchase → the webhook
+  flips `plan/current` → paid scans work. (Allow a few seconds for the webhook; the app shows
+  "activating…" and you tap Analyze again — by design.)
+- Before App Store submit: swap the `test_` key for `appl_`, bake it into a git-ignored
+  `Secrets.swift`, and add a real **privacy policy URL** (placeholder in `PaywallView`).
