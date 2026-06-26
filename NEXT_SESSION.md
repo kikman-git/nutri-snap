@@ -12,6 +12,55 @@ Milestones **1–5 + 4A done**; app builds + runs on the iPhone 16 Plus sim (iOS
 
 - **M5 just landed — onboarding + personalized targets.** First-run gate collects body stats → **Mifflin–St Jeor** daily target (`Models/NutritionMath.swift`); micro references **personalized by sex**; edit later via the person icon in the Trends header. Verified on sim (math correct; fixed a segmented-`Picker` binding bug). Hook: `FORCE_ONBOARDING=1` + `USE_SAMPLE=1`.
 - **Repo is public / open-source.** Secret audit done: **no API keys or credentials in any tracked file or in git history.** `GoogleService-Info.plist` is gitignored + was never committed; Cloud Functions read every secret from `process.env` (nothing hardcoded). App Check **debug tokens** were scrubbed from the docs — if any were ever live, delete them in Firebase console (App Check → Manage debug tokens). Personal email scrubbed from this doc.
+- **Direction (2026-06-26) — next build is M6: a server-enforced paywall, *no login* (grill-resolved).** Branch `m6-paywall`. The Apple Developer Program is now **paid** ✅. See the Active section below.
+
+## Active: M6 — server-enforced paywall (no login) · branch `m6-paywall`
+
+Decided via design grill (2026-06-26). The "add login" task was reframed: login isn't needed
+to take money (StoreKit bills the Apple ID; RevenueCat tracks entitlement against
+`appUserID = Firebase anon uid`). So **login is deferred** and the goal — cover infra cost —
+is met by a **paywall with a full backend trust boundary**.
+
+**Locked decisions**
+- **Identity:** stay anonymous Firebase auth; defer Apple/Google sign-in (revisit when
+  cross-device data continuity matters). RevenueCat `appUserID = Firebase uid`.
+- **Free taste:** 3 *lifetime* free scans, enforced server-side (reinstall resets it — ok;
+  harden with DeviceCheck only if abused).
+- **Subscription:** Monthly + Annual, each with a 7-day Apple free trial. Prices set in ASC
+  (~¥800 / ~¥5,800 start; infra cost is <$1/user/mo, so margin isn't the constraint).
+- **Enforcement:** full backend trust boundary — Gemini moves server-side; the only path to it
+  is the authenticated + App-Check-enforced + quota-checked callable.
+- **Transport:** inline image bytes in ONE `scanMeal` callable (reserve → Gemini →
+  commit/refund, all server-side). **No R2, no Cloud Storage** (skips milestone M7); photos
+  stay on-device.
+- **Paywall:** custom SwiftUI on the Theme, driven by RevenueCat offerings + a Restore button.
+- **Out of scope:** meal_photo only (OCR = v2), no login, no R2/cloud photos, no account-
+  deletion UI (flag for launch — PRD Q#11).
+
+This **collapses milestones M5/M6/M8/M9 and drops M7** (see `IMPLEMENTATION_MILESTONES.md` →
+"v1 Paywall Scope Decision" + the 2026-06-12 review findings = the scaffold bugs to fix as we go).
+
+**Build order (backend-first)**
+1. `functions/`: collapse `startScan`/`processScan`/`finalizeScan`/`getR2SignedUploadUrl` → one
+   `scanMeal(imageBase64, note)`; real server-side Gemini (`@google/generative-ai`, key in Secret
+   Manager; port `GeminiPrompt` + `EstimatedMeal` contract + the thinking cap); 3-lifetime free +
+   premium monthly cap; `enforceAppCheck: true`; fix review-findings bugs (webhook CANCELLATION,
+   header-only secret, quota race inside the tx).
+2. **Firestore rules (correctness-critical):** client read/write `entries`+`days`+profile only;
+   `plan`/`quota`/`scans` become backend-write-only — else a modified client just writes its own
+   `plan/current {hasActiveEntitlement:true}` and the trust boundary is moot.
+3. `ios/`: `BackendMealEstimator` (`MealEstimating`) → calls the callable via FirebaseFunctions;
+   retire the on-device Gemini path (keep `MockMealEstimator`). Add RevenueCat SDK +
+   `configure(appUserID: uid)`; wire `PlanService`/`PlanModels` to `customerInfo`. Custom SwiftUI
+   paywall + gating (3 free exhausted & no entitlement → gentle paywall; also reachable from Settings).
+
+**Operational (yours — blocks live testing; Apple Dev Program is PAID ✅)**
+- Enable **Blaze** (Functions + outbound to Gemini need it).
+- App Store Connect: app record + Paid Apps agreement; 2 auto-renewable subs in one group +
+  7-day intro trials + prices.
+- RevenueCat: account, link ASC, "premium" entitlement + offerings, SDK key + webhook secret.
+- Function secrets: `GEMINI_API_KEY`, `REVENUECAT_WEBHOOK_SHARED_SECRET`, `APP_CHECK_REQUIRED=true`;
+  point the RevenueCat webhook at the deployed `revenuecatWebhook`.
 
 ## Next: device + App Store track
 
