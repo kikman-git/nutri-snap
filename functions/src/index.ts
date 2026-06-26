@@ -11,6 +11,7 @@ import {
 } from 'firebase-admin/firestore';
 
 import {
+  EnergyShape,
   EstimatedMealWire,
   PlanState,
   PlanTier,
@@ -40,7 +41,9 @@ Decide the input mode:
 
 Write each food's display name in the user's locale (Japanese or English). Keep the balanceNote to one short, warm sentence (e.g. "Looks balanced" / "Good protein here"). Use confidence 0–1 honestly; low confidence is fine and expected.
 
-Also estimate, for the whole meal, these micronutrients from typical food composition — rough is expected, they're inherently uncertain: fiber (g), omega-3 (g), vitamin C (mg), vitamin A (µgRAE), zinc (mg), iron (mg), magnesium (mg).
+Also estimate, for the whole meal, these micronutrients from typical food composition — rough is expected, they're inherently uncertain: fiber (g), omega-3 (g), vitamin C (mg), vitamin A (µgRAE), zinc (mg), iron (mg), magnesium (mg), potassium (mg), vitamin D (µg), vitamin B12 (µg), folate (µg).
+
+Also give a gentle "energy read" for the whole meal — how it's likely to make someone feel over the next couple of hours — as a population-level qualitative cue, never a glucose number and never a personal prediction. Weigh the levers: protein, fat and viscous fiber steady it; a large portion of refined or quick carbohydrate (white rice, bread, sugar, juice) pushes it toward a quicker rise. Choose exactly one: "steady" (slow, even energy), "gentleRise" (a moderate, even lift), or "spike" (a quicker rise-and-dip). Stay kind — never call a food bad.
 
 If the photo is clearly not a meal, set "notFood": true with an empty items array and a kind one-line balanceNote.`;
 
@@ -52,12 +55,14 @@ const GEMINI_JSON_CONTRACT = `Return ONLY a JSON object, no prose, in exactly th
   ],
   "totals": { "kcal": number, "protein": number, "carbs": number, "fat": number },
   "micros": { "fiber": number, "omega3": number, "vitaminC": number,
-              "vitaminA": number, "zinc": number, "iron": number, "magnesium": number },
+              "vitaminA": number, "zinc": number, "iron": number, "magnesium": number,
+              "potassium": number, "vitaminD": number, "b12": number, "folate": number },
+  "energy": "steady" | "gentleRise" | "spike",
   "balanceNote": string,
   "source": "vision" | "ocr",
   "notFood": boolean
 }
-Macros are grams. Totals are the sum across items. Micros are for the whole meal: fiber and omega-3 in grams, vitamin A in µg, the rest in mg.`;
+Macros are grams. Totals are the sum across items. Micros are for the whole meal: fiber and omega-3 in grams; vitamin A, vitamin D, B12 and folate in µg; vitamin C, zinc, iron, magnesium and potassium in mg.`;
 
 // Wraps the reviewer's optional note as *extra context*, framed as data not instructions
 // (prompt-injection hygiene). Re-affirms JSON-only so it stays the last word.
@@ -223,6 +228,12 @@ async function callGemini(
   }
   if (!Array.isArray(parsed.items) || typeof parsed.balanceNote !== 'string') {
     throw new Error('Gemini JSON missing required fields (items / balanceNote)');
+  }
+  // Normalize the energy read: drop anything outside the allowed set so an unexpected string can't
+  // reach the client (Swift's EnergyShape decode would throw on an unknown rawValue). Gentle, not fatal.
+  const ENERGY_SHAPES: EnergyShape[] = ['steady', 'gentleRise', 'spike'];
+  if (parsed.energy && !ENERGY_SHAPES.includes(parsed.energy)) {
+    parsed.energy = undefined;
   }
   return parsed;
 }

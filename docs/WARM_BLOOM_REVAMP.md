@@ -58,7 +58,21 @@ keep new chart math in functions, not inline.
 - **D5–D9** remain at the recommended defaults in the table below (manual-entry deferred, prose Reflect now,
   drop the Welcome "Sign in" line, nameless greeting, Fill-the-gaps without the reminder CTA + Plus-gated).
 
-### Phase 1 starts with a data foundation (because of D1 + D2)
+### Phase 1 starts with a data foundation (because of D1 + D2) — ✅ DONE (2026-06-26)
+**The data/contract foundation is implemented; iOS build + `npm run build` green.** What landed (all 6
+steps below): `Nutrient` grew 8 → 12 (+potassium/vitaminD/b12/folate, with `displayName`/`unit`); new
+`EnergyShape {steady,gentleRise,spike}` (with `label`/`accentLine`) + `MealSlot {breakfast,lunch,dinner,
+snack}` (with `default(for:)` mirroring `mealWord`); `Entry` gained optional `energy` + `mealSlot` (back-
+compat via synthesized optional `Codable`); `EstimatedMeal` gained `energy`, and `asEntry` defaults the
+slot from the capture hour; `NutritionMath.microReferences` extended with the 4 MHLW DRIs (potassium/D by
+sex/AI, B12/folate RDA); the **two-copy §6 contract + both prompts** (`MealEstimating.swift` ↔
+`functions/src/{models,index}.ts`) now request the 4 micros + the energy read, **normalized server-side**;
+`NUTRITION_EVIDENCE.md` §3 (focused-12 grades) + §4 (Energy Read = the glucose-impact signal, model-
+estimated D1) updated; `NutrientGuide` flipped D/B12/folate → tracked + added potassium; `SampleData` +
+`MockMealEstimator` fixtures populated with the new micros + energy + slots. **Screen restyles (§1.1–1.8)
+are the remaining Phase-1 work.** ⚠️ Live D1/D2 still gated on the M6 backend deploy — verified via mock +
+typecheck only.
+
 The hero screens (Logged, Trends sufficiency, Today·Home, meal rows) can't be restyled to show the new
 nutrients / energy read until the model + contract carry them. Do this **before** the screen restyles, and
 remember the **two-copy §6 contract drifts** + **tolerant decoders**:

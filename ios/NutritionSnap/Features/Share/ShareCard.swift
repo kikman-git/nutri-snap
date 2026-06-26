@@ -79,7 +79,7 @@ struct ShareCard: View {
         .padding(.top, 2)
     }
 
-    /// Compact labels so all seven fit in one row (full names live in-app).
+    /// Compact labels for the micro row (full names live in-app).
     static func shortName(_ n: Nutrient) -> String {
         switch n {
         case .fiber:     return "Fiber"
@@ -90,6 +90,10 @@ struct ShareCard: View {
         case .iron:      return "Iron"
         case .magnesium: return "Mag"
         case .protein:   return "Protein"
+        case .potassium: return "K"
+        case .vitaminD:  return "Vit D"
+        case .b12:       return "B12"
+        case .folate:    return "Folate"
         }
     }
 
