@@ -40,27 +40,24 @@ is met by a **paywall with a full backend trust boundary**.
 This **collapses milestones M5/M6/M8/M9 and drops M7** (see `IMPLEMENTATION_MILESTONES.md` →
 "v1 Paywall Scope Decision" + the 2026-06-12 review findings = the scaffold bugs to fix as we go).
 
-**Build order (backend-first)**
-1. `functions/`: collapse `startScan`/`processScan`/`finalizeScan`/`getR2SignedUploadUrl` → one
-   `scanMeal(imageBase64, note)`; real server-side Gemini (`@google/generative-ai`, key in Secret
-   Manager; port `GeminiPrompt` + `EstimatedMeal` contract + the thinking cap); 3-lifetime free +
-   premium monthly cap; `enforceAppCheck: true`; fix review-findings bugs (webhook CANCELLATION,
-   header-only secret, quota race inside the tx).
-2. **Firestore rules (correctness-critical):** client read/write `entries`+`days`+profile only;
-   `plan`/`quota`/`scans` become backend-write-only — else a modified client just writes its own
-   `plan/current {hasActiveEntitlement:true}` and the trust boundary is moot.
-3. `ios/`: `BackendMealEstimator` (`MealEstimating`) → calls the callable via FirebaseFunctions;
-   retire the on-device Gemini path (keep `MockMealEstimator`). Add RevenueCat SDK +
-   `configure(appUserID: uid)`; wire `PlanService`/`PlanModels` to `customerInfo`. Custom SwiftUI
-   paywall + gating (3 free exhausted & no entitlement → gentle paywall; also reachable from Settings).
+**Build order (backend-first) — status 2026-06-26**
+1. ✅ **DONE** (commit `16359b7`) — `functions/`: collapsed the R2 multi-call scaffold into one
+   `scanMeal(imageBase64, note)`; server-side Gemini via **REST `fetch`** (no new dep; key in
+   Secret Manager; ported `GeminiPrompt` + the thinking cap); 3-lifetime free + monthly paid cap;
+   `enforceAppCheck: true`; webhook fixed (CANCELLATION→active-until-expiry, header-only secret).
+   Typechecks.
+2. ✅ **DONE** (commit `16359b7`) — `firestore.rules`: `plan`/`quota`/`scans` backend-write-only,
+   client read-only.
+3. ✅ **DONE** (commit `eef966a`) — `ios/`: `BackendMealEstimator` calls `scanMeal` via
+   FirebaseFunctions; on-device Gemini retired behind `ONDEVICE_GEMINI=1`. Builds + mock smoke OK.
+4. ⏳ **NEXT (paused — awaiting operational setup):** RevenueCat SDK + `configure(appUserID: uid)`,
+   wire `PlanService`/`PlanModels` to `customerInfo`, **custom SwiftUI paywall** + gating (3 free
+   used & not entitled → paywall; also from Settings), read `quota/summary` for "N free left".
+   Need from you first: the RevenueCat public SDK key + the ASC products (see runbook).
 
-**Operational (yours — blocks live testing; Apple Dev Program is PAID ✅)**
-- Enable **Blaze** (Functions + outbound to Gemini need it).
-- App Store Connect: app record + Paid Apps agreement; 2 auto-renewable subs in one group +
-  7-day intro trials + prices.
-- RevenueCat: account, link ASC, "premium" entitlement + offerings, SDK key + webhook secret.
-- Function secrets: `GEMINI_API_KEY`, `REVENUECAT_WEBHOOK_SHARED_SECRET`, `APP_CHECK_REQUIRED=true`;
-  point the RevenueCat webhook at the deployed `revenuecatWebhook`.
+**➡️ Operational setup + deploy: [`M6_SETUP.md`](M6_SETUP.md)** (Apple Dev Program is PAID ✅).
+⚠️ **The app can't scan until Part A (Blaze + secrets + deploy + App Check token) is done** — the
+client now calls the backend. Part B (RevenueCat/ASC) unblocks the paywall.
 
 ## Next: device + App Store track
 
